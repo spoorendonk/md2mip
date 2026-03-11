@@ -1,0 +1,7 @@
+I: ["corn", "oats"]
+cost: [0.30, 0.50]
+protein: [0.09, 0.15]
+fiber: [0.02, 0.08]
+min_total: 100
+min_protein: 0.10
+max_fiber: 0.05

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "md2mip"
+version = "0.1.0"
+description = "Compile Markdown/LaTeX MIP models into standalone Python solver scripts"
+requires-python = ">=3.10"
+dependencies = [
+    "litellm",
+    "click",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "highspy",
+    "numpy",
+    "pyyaml",
+]
+
+[project.scripts]
+md2mip = "md2mip.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+markers = [
+    "solver: tests that require HiGHS solver (run by default)",
+]

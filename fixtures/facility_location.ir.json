@@ -1,0 +1,42 @@
+{
+  "name": "facility_location",
+  "sets": {
+    "I": { "description": "potential facility locations" },
+    "J": { "description": "customers" }
+  },
+  "parameters": {
+    "f": { "indices": ["I"], "description": "fixed cost of opening facility" },
+    "c": { "indices": ["I", "J"], "description": "service cost" }
+  },
+  "variables": {
+    "y": {
+      "indices": ["I"],
+      "type": "binary",
+      "lower_bound": 0,
+      "upper_bound": 1,
+      "description": "1 if facility is opened"
+    },
+    "x": {
+      "indices": ["I", "J"],
+      "type": "binary",
+      "lower_bound": 0,
+      "upper_bound": 1,
+      "description": "1 if customer j is served from facility i"
+    }
+  },
+  "objective": {
+    "sense": "minimize",
+    "expression": "sum(f[i] * y[i] for i in I) + sum(c[i,j] * x[i,j] for i in I for j in J)"
+  },
+  "constraints": {
+    "assignment": {
+      "for_all": ["j in J"],
+      "expression": "sum(x[i,j] for i in I) == 1"
+    },
+    "linking": {
+      "for_all": ["i in I", "j in J"],
+      "expression": "x[i,j] <= y[i]"
+    }
+  },
+  "warnings": []
+}

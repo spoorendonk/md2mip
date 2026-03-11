@@ -1,0 +1,34 @@
+{
+  "name": "assignment",
+  "sets": {
+    "I": { "description": "workers" },
+    "J": { "description": "tasks" }
+  },
+  "parameters": {
+    "c": { "indices": ["I", "J"], "description": "cost of assigning worker i to task j" }
+  },
+  "variables": {
+    "x": {
+      "indices": ["I", "J"],
+      "type": "binary",
+      "lower_bound": 0,
+      "upper_bound": 1,
+      "description": "1 if worker i is assigned to task j"
+    }
+  },
+  "objective": {
+    "sense": "minimize",
+    "expression": "sum(c[i,j] * x[i,j] for i in I for j in J)"
+  },
+  "constraints": {
+    "one_task_per_worker": {
+      "for_all": ["i in I"],
+      "expression": "sum(x[i,j] for j in J) == 1"
+    },
+    "one_worker_per_task": {
+      "for_all": ["j in J"],
+      "expression": "sum(x[i,j] for i in I) == 1"
+    }
+  },
+  "warnings": []
+}

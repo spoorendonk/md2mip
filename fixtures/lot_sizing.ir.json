@@ -1,0 +1,56 @@
+{
+  "name": "lot_sizing",
+  "sets": {
+    "T": { "description": "time periods" }
+  },
+  "parameters": {
+    "d": { "indices": ["T"], "description": "demand per period" },
+    "p": { "indices": [], "description": "production cost per unit", "default": 5 },
+    "h": { "indices": [], "description": "holding cost per unit per period", "default": 2 },
+    "K": { "indices": [], "description": "setup cost", "default": 50 },
+    "M": { "indices": [], "description": "max production per period", "default": 40 },
+    "I_init": { "indices": [], "description": "initial inventory", "default": 5 }
+  },
+  "variables": {
+    "x": {
+      "indices": ["T"],
+      "type": "continuous",
+      "lower_bound": 0,
+      "upper_bound": null,
+      "description": "units produced in period t"
+    },
+    "Inv": {
+      "indices": ["T"],
+      "type": "continuous",
+      "lower_bound": 0,
+      "upper_bound": null,
+      "description": "inventory at end of period t"
+    },
+    "z": {
+      "indices": ["T"],
+      "type": "binary",
+      "lower_bound": 0,
+      "upper_bound": 1,
+      "description": "1 if production occurs in period t"
+    }
+  },
+  "objective": {
+    "sense": "minimize",
+    "expression": "sum(p * x[t] + h * Inv[t] + K * z[t] for t in T)"
+  },
+  "constraints": {
+    "balance_first": {
+      "for_all": [],
+      "expression": "Inv[0] == I_init + x[0] - d[0]"
+    },
+    "balance": {
+      "for_all": ["t in T"],
+      "expression": "Inv[t] == Inv[t-1] + x[t] - d[t]"
+    },
+    "setup": {
+      "for_all": ["t in T"],
+      "expression": "x[t] <= M * z[t]"
+    }
+  },
+  "warnings": ["balance constraint uses t-1 lag; balance_first handles t=0 with I_init"]
+}

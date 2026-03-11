@@ -1,0 +1,7 @@
+I: ["factory1", "factory2"]
+J: ["warehouse1", "warehouse2", "warehouse3"]
+c:
+  - [4, 8, 1]
+  - [7, 2, 3]
+s: [30, 50]
+d: [20, 25, 35]

@@ -1,0 +1,42 @@
+{
+  "name": "blending",
+  "sets": {
+    "I": { "description": "ingredients" }
+  },
+  "parameters": {
+    "cost": { "indices": ["I"], "description": "cost per kg" },
+    "protein": { "indices": ["I"], "description": "protein fraction" },
+    "fiber": { "indices": ["I"], "description": "fiber fraction" },
+    "min_total": { "indices": [], "description": "minimum total kg", "default": 100 },
+    "min_protein": { "indices": [], "description": "minimum protein fraction", "default": 0.10 },
+    "max_fiber": { "indices": [], "description": "maximum fiber fraction", "default": 0.05 }
+  },
+  "variables": {
+    "x": {
+      "indices": ["I"],
+      "type": "continuous",
+      "lower_bound": 0,
+      "upper_bound": null,
+      "description": "kg of ingredient i"
+    }
+  },
+  "objective": {
+    "sense": "minimize",
+    "expression": "sum(cost[i] * x[i] for i in I)"
+  },
+  "constraints": {
+    "min_quantity": {
+      "for_all": [],
+      "expression": "sum(x[i] for i in I) >= min_total"
+    },
+    "min_protein_req": {
+      "for_all": [],
+      "expression": "sum((protein[i] - min_protein) * x[i] for i in I) >= 0"
+    },
+    "max_fiber_req": {
+      "for_all": [],
+      "expression": "sum((fiber[i] - max_fiber) * x[i] for i in I) <= 0"
+    }
+  },
+  "warnings": ["Blending constraints linearized by moving percentage terms to LHS"]
+}

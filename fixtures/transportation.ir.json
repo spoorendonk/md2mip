@@ -1,0 +1,36 @@
+{
+  "name": "transportation",
+  "sets": {
+    "I": { "description": "sources (factories)" },
+    "J": { "description": "destinations (warehouses)" }
+  },
+  "parameters": {
+    "c": { "indices": ["I", "J"], "description": "unit transport cost" },
+    "s": { "indices": ["I"], "description": "supply capacity" },
+    "d": { "indices": ["J"], "description": "demand" }
+  },
+  "variables": {
+    "x": {
+      "indices": ["I", "J"],
+      "type": "continuous",
+      "lower_bound": 0,
+      "upper_bound": null,
+      "description": "amount shipped"
+    }
+  },
+  "objective": {
+    "sense": "minimize",
+    "expression": "sum(c[i,j] * x[i,j] for i in I for j in J)"
+  },
+  "constraints": {
+    "supply": {
+      "for_all": ["i in I"],
+      "expression": "sum(x[i,j] for j in J) <= s[i]"
+    },
+    "demand": {
+      "for_all": ["j in J"],
+      "expression": "sum(x[i,j] for i in I) >= d[j]"
+    }
+  },
+  "warnings": []
+}
