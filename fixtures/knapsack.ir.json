@@ -1,16 +1,16 @@
 {
   "name": "knapsack",
   "sets": {
-    "N": { "description": "items" }
+    "I": { "description": "items" }
   },
   "parameters": {
-    "v": { "indices": ["N"], "description": "item values" },
-    "w": { "indices": ["N"], "description": "item weights" },
+    "v": { "indices": ["I"], "description": "item values" },
+    "w": { "indices": ["I"], "description": "item weights" },
     "W": { "indices": [], "description": "knapsack capacity" }
   },
   "variables": {
     "x": {
-      "indices": ["N"],
+      "indices": ["I"],
       "type": "binary",
       "lower_bound": 0,
       "upper_bound": 1,
@@ -19,12 +19,12 @@
   },
   "objective": {
     "sense": "maximize",
-    "expression": "sum(v[i] * x[i] for i in N)"
+    "expression": "sum(v[i] * x[i] for i in I)"
   },
   "constraints": {
     "capacity": {
       "for_all": [],
-      "expression": "sum(w[i] * x[i] for i in N) <= W"
+      "expression": "sum(w[i] * x[i] for i in I) <= W"
     }
   },
   "warnings": []

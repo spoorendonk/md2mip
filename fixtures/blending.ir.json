@@ -7,7 +7,7 @@
     "cost": { "indices": ["I"], "description": "cost per kg" },
     "protein": { "indices": ["I"], "description": "protein fraction" },
     "fiber": { "indices": ["I"], "description": "fiber fraction" },
-    "min_total": { "indices": [], "description": "minimum total kg", "default": 100 },
+    "min_feed": { "indices": [], "description": "minimum total kg", "default": 100 },
     "min_protein": { "indices": [], "description": "minimum protein fraction", "default": 0.10 },
     "max_fiber": { "indices": [], "description": "maximum fiber fraction", "default": 0.05 }
   },
@@ -27,7 +27,7 @@
   "constraints": {
     "min_quantity": {
       "for_all": [],
-      "expression": "sum(x[i] for i in I) >= min_total"
+      "expression": "sum(x[i] for i in I) >= min_feed"
     },
     "min_protein_req": {
       "for_all": [],

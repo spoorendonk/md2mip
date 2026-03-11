@@ -82,8 +82,9 @@ Return ONLY valid JSON (no markdown fences, no explanation) with this schema:
 - Use a variable name different from any parameter (e.g., `Inv` not `I` if `I` is a set).
 
 ### Blending / Percentage Constraints
-- For constraints like "at least 20% protein": write as `sum(protein[i] * x[i] for i in I) >= min_protein * sum(x[i] for i in I)`.
-- These are linear when rearranged (move RHS to LHS).
+- For constraints like "at least 20% protein": LINEARIZE by moving the RHS to the LHS.
+- Write as `sum((protein[i] - min_protein) * x[i] for i in I) >= 0` (NOT `sum(...) >= min_protein * sum(...)`).
+- This ensures all constraints are linear with variables only on the LHS.
 
 ## Worked Example
 

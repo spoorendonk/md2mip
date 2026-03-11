@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import json
 import re
+import time
 
 import litellm
 
 from md2mip.prompt import SYSTEM_PROMPT
 
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
+
+MAX_RETRIES = 3
+RETRY_BACKOFF = 10  # seconds
 
 
 class LLMError(Exception):
@@ -30,18 +34,29 @@ def parse_model(markdown: str, model: str = DEFAULT_MODEL) -> dict:
     Raises:
         LLMError: If the API call fails or the response isn't valid JSON.
     """
-    try:
-        response = litellm.completion(
-            model=model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": markdown},
-            ],
-            temperature=0,
-            max_tokens=4096,
-        )
-    except Exception as e:
-        raise LLMError(f"LLM API call failed ({model}): {e}") from e
+    last_err = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            response = litellm.completion(
+                model=model,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": markdown},
+                ],
+                temperature=0,
+                max_tokens=4096,
+            )
+            break
+        except litellm.RateLimitError as e:
+            last_err = e
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(RETRY_BACKOFF * (attempt + 1))
+                continue
+            raise LLMError(f"LLM rate limited after {MAX_RETRIES} retries ({model}): {e}") from e
+        except Exception as e:
+            raise LLMError(f"LLM API call failed ({model}): {e}") from e
+    else:
+        raise LLMError(f"LLM rate limited after {MAX_RETRIES} retries ({model}): {last_err}") from last_err
 
     content = response.choices[0].message.content
 

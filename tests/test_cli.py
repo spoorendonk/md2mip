@@ -41,6 +41,36 @@ class TestCompileCommand:
             assert "import highspy" in content
 
 
+    def test_compile_passes_model_flag(self, tmp_path):
+        """Test --model flag is forwarded to LLM."""
+        fixture = load_fixture("transportation")
+        model_file = tmp_path / "model.md"
+        model_file.write_text("# Test model")
+
+        with patch("md2mip.compiler.parse_model", return_value=fixture) as mock:
+            runner = CliRunner()
+            result = runner.invoke(cli, [
+                "compile", str(model_file), "--ir-only",
+                "--model", "ollama/qwen3",
+            ])
+            assert result.exit_code == 0
+            mock.assert_called_once()
+            assert mock.call_args[1]["model"] == "ollama/qwen3"
+
+    def test_compile_llm_error(self, tmp_path):
+        """Test graceful error when LLM fails."""
+        from md2mip.llm import LLMError
+        model_file = tmp_path / "model.md"
+        model_file.write_text("# Test model")
+
+        with patch("md2mip.compiler.parse_model", side_effect=LLMError("API down")):
+            runner = CliRunner()
+            result = runner.invoke(cli, [
+                "compile", str(model_file), "--ir-only",
+            ])
+            assert result.exit_code != 0
+
+
 class TestRunCommand:
     def test_run_requires_data(self):
         runner = CliRunner()

@@ -80,7 +80,13 @@ def _load_data(ir: IR) -> str:
         lines.append(f'    data["{sname}"] = list(raw["{sname}"])')
     for pname, param in ir.parameters.items():
         if param.indices:
-            lines.append(f'    data["{pname}"] = np.array(raw["{pname}"], dtype=np.float64)')
+            # Handle scalar-in-YAML for indexed params (broadcast to array)
+            set_name = param.indices[0]
+            lines.append(f'    _v_{pname} = raw["{pname}"]')
+            lines.append(f'    if isinstance(_v_{pname}, (int, float)):')
+            lines.append(f'        data["{pname}"] = np.full(len(data["{set_name}"]), float(_v_{pname}))')
+            lines.append(f'    else:')
+            lines.append(f'        data["{pname}"] = np.array(_v_{pname}, dtype=np.float64)')
         else:
             if param.default is not None:
                 lines.append(f'    data["{pname}"] = float(raw.get("{pname}", {param.default}))')
