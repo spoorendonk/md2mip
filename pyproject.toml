@@ -29,4 +29,5 @@ where = ["src"]
 [tool.pytest.ini_options]
 markers = [
     "solver: tests that require HiGHS solver (run by default)",
+    "llm: tests that require an LLM API (skipped by default, run with pytest -m llm)",
 ]

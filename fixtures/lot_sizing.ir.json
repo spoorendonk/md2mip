@@ -19,7 +19,7 @@
       "upper_bound": null,
       "description": "units produced in period t"
     },
-    "Inv": {
+    "I": {
       "indices": ["T"],
       "type": "continuous",
       "lower_bound": 0,
@@ -36,16 +36,16 @@
   },
   "objective": {
     "sense": "minimize",
-    "expression": "sum(p * x[t] + h * Inv[t] + K * z[t] for t in T)"
+    "expression": "sum(p * x[t] + h * I[t] + K * z[t] for t in T)"
   },
   "constraints": {
     "balance_first": {
       "for_all": [],
-      "expression": "Inv[0] == I_init + x[0] - d[0]"
+      "expression": "I[0] == I_init + x[0] - d[0]"
     },
     "balance": {
       "for_all": ["t in T"],
-      "expression": "Inv[t] == Inv[t-1] + x[t] - d[t]"
+      "expression": "I[t] == I[t-1] + x[t] - d[t]"
     },
     "setup": {
       "for_all": ["t in T"],
