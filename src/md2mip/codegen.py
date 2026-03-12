@@ -15,6 +15,7 @@ def generate(ir: IR) -> str:
         _load_data(ir),
         _build_model(ir),
         *_constraint_functions(ir),
+        _parse_highs_value_fn(),
         _solve_and_report(ir),
         _main(),
     ]
@@ -105,7 +106,6 @@ def _build_model(ir: IR) -> str:
 
     lines.append('')
     lines.append('    h = highspy.Highs()')
-    lines.append('    h.silent()')
     lines.append('')
 
     # Total variables
@@ -887,9 +887,31 @@ def _substitute_params(code: str, ir: IR) -> str:
 # Solve + report + main
 # ---------------------------------------------------------------------------
 
+def _parse_highs_value_fn() -> str:
+    return '''def _parse_highs_value(s):
+    """Convert a string option value to the appropriate Python type."""
+    if s.lower() in ("true", "false"):
+        return s.lower() == "true"
+    try:
+        return int(s)
+    except ValueError:
+        pass
+    try:
+        return float(s)
+    except ValueError:
+        pass
+    return s'''
+
+
 def _solve_and_report(ir: IR) -> str:
     lines = [
-        'def solve_and_report(h: highspy.Highs, data: dict):',
+        'def solve_and_report(h: highspy.Highs, data: dict, highs_opts=None):',
+        '    if highs_opts:',
+        '        for opt in highs_opts:',
+        '            name, _, value = opt.partition("=")',
+        '            if not name or not value:',
+        '                sys.exit(f"Invalid --opt format: {opt!r} (expected NAME=VALUE)")',
+        '            h.setOptionValue(name, _parse_highs_value(value))',
         '    h.run()',
         '    status = h.getInfoValue("primal_solution_status")[1]',
         '    obj = h.getInfoValue("objective_function_value")[1]',
@@ -944,8 +966,10 @@ def _main() -> str:
     return '''if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("data", help="Path to data file (YAML or JSON)")
+    parser.add_argument("--opt", action="append", default=[],
+                        metavar="NAME=VALUE", help="HiGHS option (repeatable)")
     args = parser.parse_args()
 
     data = load_data(args.data)
     h = build_model(data)
-    solve_and_report(h, data)'''
+    solve_and_report(h, data, highs_opts=args.opt)'''

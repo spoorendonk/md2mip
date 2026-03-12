@@ -12,7 +12,8 @@ from md2mip.codegen import generate
 from tests.conftest import load_fixture, DATA_DIR
 
 
-def _run_generated(fixture_name: str, data_name: str | None = None) -> tuple[int, str, str]:
+def _run_generated(fixture_name: str, data_name: str | None = None,
+                    extra_args: list[str] | None = None) -> tuple[int, str, str]:
     """Generate code from fixture, run with data, return (returncode, stdout, stderr)."""
     raw = load_fixture(fixture_name)
     ir = IR.from_dict(raw)
@@ -26,8 +27,11 @@ def _run_generated(fixture_name: str, data_name: str | None = None) -> tuple[int
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=True) as f:
         f.write(code)
         f.flush()
+        cmd = [sys.executable, f.name, str(data_path)]
+        if extra_args:
+            cmd.extend(extra_args)
         result = subprocess.run(
-            [sys.executable, f.name, str(data_path)],
+            cmd,
             capture_output=True, text=True, timeout=30,
         )
     return result.returncode, result.stdout, result.stderr
@@ -94,3 +98,39 @@ class TestBlending:
         assert rc == 0, f"Script failed:\n{stderr}"
         obj = _extract_objective(stdout)
         assert abs(obj - 33.33) < 0.5  # with min_protein=0.10 (feasible data)
+
+
+@pytest.mark.solver
+class TestHiGHSOptions:
+    def test_write_model_mps(self):
+        with tempfile.NamedTemporaryFile(suffix=".mps", delete=False) as mps:
+            mps_path = mps.name
+        try:
+            rc, stdout, stderr = _run_generated(
+                "transportation",
+                extra_args=["--opt", "write_model_to_file=true",
+                            "--opt", f"write_model_file={mps_path}"],
+            )
+            assert rc == 0, f"Script failed:\n{stderr}"
+            assert Path(mps_path).stat().st_size > 0
+        finally:
+            Path(mps_path).unlink(missing_ok=True)
+
+    def test_opt_time_limit(self):
+        rc, stdout, stderr = _run_generated(
+            "transportation",
+            extra_args=["--opt", "time_limit=1"],
+        )
+        assert rc == 0, f"Script failed:\n{stderr}"
+        obj = _extract_objective(stdout)
+        assert abs(obj - 215.0) < 0.01
+
+    def test_silent_output(self):
+        rc, stdout, stderr = _run_generated(
+            "transportation",
+            extra_args=["--opt", "output_flag=false"],
+        )
+        assert rc == 0, f"Script failed:\n{stderr}"
+        # HiGHS solver log goes to stdout; with output_flag=false it should be suppressed
+        assert "Solving report" not in stdout
+        assert "Objective:" in stdout  # our report still prints

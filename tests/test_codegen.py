@@ -68,3 +68,22 @@ class TestCodegenStructure:
         ir = IR.from_dict(raw)
         code = generate(ir)
         assert "kInteger" in code
+
+    def test_has_opt_arg(self):
+        raw = load_fixture("transportation")
+        ir = IR.from_dict(raw)
+        code = generate(ir)
+        assert '"--opt"' in code
+        assert "action=" in code
+
+    def test_has_parse_highs_value(self):
+        raw = load_fixture("transportation")
+        ir = IR.from_dict(raw)
+        code = generate(ir)
+        assert "def _parse_highs_value(" in code
+
+    def test_no_silent_in_build_model(self):
+        raw = load_fixture("transportation")
+        ir = IR.from_dict(raw)
+        code = generate(ir)
+        assert "h.silent()" not in code
