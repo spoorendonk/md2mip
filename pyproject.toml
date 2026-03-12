@@ -18,6 +18,8 @@ dev = [
     "highspy",
     "numpy",
     "pyyaml",
+    "Pillow",
+    "matplotlib",
 ]
 
 [project.scripts]

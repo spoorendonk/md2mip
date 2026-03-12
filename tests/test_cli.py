@@ -1,6 +1,5 @@
 """CLI smoke tests."""
 
-import pytest
 from unittest.mock import patch, MagicMock
 from click.testing import CliRunner
 
@@ -69,6 +68,46 @@ class TestCompileCommand:
                 "compile", str(model_file), "--ir-only",
             ])
             assert result.exit_code != 0
+
+
+class TestOcrCommand:
+    def test_ocr_to_stdout(self, tmp_path):
+        """Mock ocr_image, check stdout."""
+        img_file = tmp_path / "model.png"
+        img_file.write_bytes(b"\x89PNG" + b"\x00" * 100)
+
+        with patch("md2mip.cli.ocr_image", return_value="# Extracted Model") as mock:
+            runner = CliRunner()
+            result = runner.invoke(cli, ["ocr", str(img_file)])
+            assert result.exit_code == 0
+            assert "Extracted Model" in result.output
+            mock.assert_called_once()
+
+    def test_ocr_to_file(self, tmp_path):
+        """Mock ocr_image, check file written."""
+        img_file = tmp_path / "model.png"
+        img_file.write_bytes(b"\x89PNG" + b"\x00" * 100)
+        out_file = tmp_path / "model.md"
+
+        with patch("md2mip.cli.ocr_image", return_value="# Extracted Model"):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["ocr", str(img_file), "-o", str(out_file)])
+            assert result.exit_code == 0
+            assert out_file.exists()
+            assert "Extracted Model" in out_file.read_text()
+
+    def test_ocr_passes_model_flag(self, tmp_path):
+        """Verify --model forwarded."""
+        img_file = tmp_path / "model.png"
+        img_file.write_bytes(b"\x89PNG" + b"\x00" * 100)
+
+        with patch("md2mip.cli.ocr_image", return_value="# Model") as mock:
+            runner = CliRunner()
+            result = runner.invoke(cli, [
+                "ocr", str(img_file), "--model", "gpt-4o",
+            ])
+            assert result.exit_code == 0
+            mock.assert_called_once_with(str(img_file), model="gpt-4o")
 
 
 class TestRunCommand:

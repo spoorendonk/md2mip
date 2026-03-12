@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -10,6 +9,7 @@ import click
 
 from md2mip.compiler import compile_to_ir, compile_to_python, run_model
 from md2mip.llm import DEFAULT_MODEL
+from md2mip.ocr import ocr_image
 
 
 @click.group()
@@ -48,3 +48,18 @@ def run(model_path: str, data: str, model: str):
     markdown = Path(model_path).read_text()
     result = run_model(markdown, data, model=model)
     sys.exit(result.returncode)
+
+
+@cli.command()
+@click.argument("image_path", type=click.Path(exists=True))
+@click.option("-o", "--output", type=click.Path(), default=None, help="Output file path")
+@click.option("--model", default=DEFAULT_MODEL, help=f"LLM model string (default: {DEFAULT_MODEL})")
+def ocr(image_path: str, output: str | None, model: str):
+    """Extract a math model from an image using LLM vision."""
+    result = ocr_image(image_path, model=model)
+
+    if output:
+        Path(output).write_text(result)
+        click.echo(f"Written to {output}")
+    else:
+        click.echo(result)
