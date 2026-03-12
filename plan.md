@@ -10,42 +10,37 @@ All steps complete. 49 tests pass. Committed as `d66db81`.
 - Click CLI: `compile` (with `--ir-only`, `-o`, `--model`) and `run` (with `--data`)
 - Fixture-based testing: unit, codegen syntax, solver correctness, CLI smoke
 
-**Known data corrections from original plan:**
-- Transportation optimal = 215 (not 110 — plan's expected value was wrong for the data)
-- Facility location optimal = 185 (not 275 — opening only C is cheaper than A+C)
-- Blending min_protein = 10% (not 20% — both ingredients < 20% made it infeasible)
+## Phase 2: End-to-End LLM Validation ✅
 
-## Phase 2: End-to-End LLM Validation (current)
+Committed as `01ffce7`. LLM integration tests for all 6 models.
 
-Test that the full pipeline works: markdown → LLM → IR → codegen → solve.
+- `@pytest.mark.llm` tests: compile to valid IR, solve to correct optima
+- Rate-limit-aware test fixtures with pause between calls
+- Lot sizing feasibility check (no exact optimum, upper bound only)
 
-### Steps
+## Phase 3: OCR + Nasty Models ✅
 
-1. **LLM integration test**: run `md2mip compile` on each of the 6 model .md files,
-   verify the LLM produces IR that passes validation and generates solvable code.
-   Mark tests with `@pytest.mark.llm` (skip by default, run with `pytest -m llm`).
+Committed as `f391495`.
 
-2. **Capture good IRs**: when LLM output is correct, save as fixtures to replace
-   the hand-written ones. This makes fixture-based tests more realistic.
+- `md2mip ocr <image> [-o model.md]` — extract math models from images via LLM vision
+- 6 nasty/ambiguous model rewrites: sloppy notation, pure prose, table-only, misleading text, trivial edge case
+- Rendered-math test images via matplotlib (proper sigmas, subscripts, inequalities)
+- Codegen fix for bare variable references and zero-set models
+- Compile default output to `out/<stem>_solver.py` with run instructions
+- 59 offline tests pass
 
-3. **Prompt refinement**: iterate on `prompt.py` if any model fails to parse correctly.
-   The 6 models cover varied notation styles — this is the real stress test.
+## Phase 4: Generated Script Enhancements ✅
 
-4. **CLI end-to-end**: `md2mip compile models/transportation.md --ir-only` should
-   output valid IR JSON. `md2mip run models/knapsack.md --data data/knapsack.yaml`
-   should print the optimal solution.
+- `--opt NAME=VALUE` repeatable flag for HiGHS option passthrough
+- `_parse_highs_value()` helper converts string values to bool/int/float/str
+- Removed `h.silent()` — users control output via `--opt output_flag=false`
+- MPS export via `--opt write_model_to_file=true --opt write_model_file=out.mps`
 
-### Success criteria
-
-- All 6 models: `md2mip compile models/<X>.md -o /tmp/solver.py && python /tmp/solver.py data/<X>.yaml` produces correct optimal
-- `md2mip compile models/transportation.md --ir-only` outputs valid IR JSON
-- Existing 49 tests still pass
-- New LLM integration tests pass (when API key available)
-
-## Phase 3: Extensions (future)
-
-From plan-md2mip.md:
-- `md2mip ocr <image.png> -o model.md` — OCR via Claude vision
-- `md2mip compile --target mps` — MPS file output
-- Multiple data scenarios / batch solve
-- Solution report generation
+Stretch goals:
+- **Round-trip reporting**: format solution back into markdown tables matching input model structure
+- **Model diff**: `md2mip diff v1.md v2.md` — compile both to IR, compare structurally, output human-readable diff
+- **Parametric sweep**: `--sweep param=start:step:end` in generated scripts, outputs CSV
+- **Infeasibility diagnosis**: extract IIS via HiGHS when solver returns infeasible
+- **Abstract model library**: save compiled IRs as `.ir.json`, re-compile without LLM
+- **Flowty integration**: detect network flow structure in IR → Flowty-based solver
+- **Validation mode**: `md2mip validate model.md --data data.yaml --expect-objective 215`

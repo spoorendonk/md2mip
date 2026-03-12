@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 
-from md2mip.compiler import compile_to_ir, compile_to_python, run_model
+from md2mip.compiler import compile_to_ir, compile_to_python, run_model, validate_model
 from md2mip.llm import DEFAULT_MODEL
 from md2mip.ocr import ocr_image
 
@@ -74,3 +74,21 @@ def ocr(image_path: str, output: str | None, model: str):
         click.echo(f"Written to {output}")
     else:
         click.echo(result)
+
+
+@cli.command()
+@click.argument("model_path", type=click.Path(exists=True))
+@click.option("--data", required=True, type=click.Path(exists=True), help="Data file (YAML or JSON)")
+@click.option("--expect-objective", required=True, type=float, help="Expected objective value")
+@click.option("--tol", default=0.01, type=float, help="Absolute tolerance (default: 0.01)")
+@click.option("--model", default=DEFAULT_MODEL, help=f"LLM model string (default: {DEFAULT_MODEL})")
+def validate(model_path: str, data: str, expect_objective: float, tol: float, model: str):
+    """Validate a model: compile, run, check objective value."""
+    markdown = Path(model_path).read_text()
+    passed, actual, stdout = validate_model(markdown, data, expect_objective, tol=tol, model=model)
+    if passed:
+        click.echo(f"PASS (expected={expect_objective}, actual={actual:.4f}, tol={tol})")
+    else:
+        actual_str = f"{actual:.4f}" if actual is not None else "N/A"
+        click.echo(f"FAIL (expected={expect_objective}, actual={actual_str}, tol={tol})")
+        sys.exit(1)
