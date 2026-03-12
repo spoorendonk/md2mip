@@ -1,6 +1,6 @@
 """CLI smoke tests."""
 
-import pytest
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 from click.testing import CliRunner
 
@@ -10,7 +10,7 @@ from tests.conftest import load_fixture
 
 class TestCompileCommand:
     def test_compile_ir_only(self, tmp_path):
-        """Test --ir-only flag with mocked LLM."""
+        """Test --ir-only flag outputs to stdout."""
         fixture = load_fixture("transportation")
         model_file = tmp_path / "model.md"
         model_file.write_text("# Test model")
@@ -23,8 +23,29 @@ class TestCompileCommand:
             assert result.exit_code == 0
             assert '"transportation"' in result.output
 
+    def test_compile_default_writes_to_out_dir(self, tmp_path):
+        """Without -o, compile writes to out/<stem>_solver.py."""
+        fixture = load_fixture("transportation")
+        model_file = tmp_path / "mymodel.md"
+        model_file.write_text("# Test model")
+        out_dir = tmp_path / "out"
+
+        with (
+            patch("md2mip.compiler.parse_model", return_value=fixture),
+            patch("md2mip.cli.OUT_DIR", out_dir),
+        ):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["compile", str(model_file)])
+
+        assert result.exit_code == 0
+        out_file = out_dir / "mymodel_solver.py"
+        assert out_file.exists()
+        assert "import highspy" in out_file.read_text()
+        assert "Written to" in result.output
+        assert "Run:" in result.output
+
     def test_compile_to_file(self, tmp_path):
-        """Test -o flag."""
+        """Test -o flag writes to explicit path."""
         fixture = load_fixture("transportation")
         model_file = tmp_path / "model.md"
         model_file.write_text("# Test model")
@@ -39,7 +60,6 @@ class TestCompileCommand:
             assert out_file.exists()
             content = out_file.read_text()
             assert "import highspy" in content
-
 
     def test_compile_passes_model_flag(self, tmp_path):
         """Test --model flag is forwarded to LLM."""
@@ -69,6 +89,46 @@ class TestCompileCommand:
                 "compile", str(model_file), "--ir-only",
             ])
             assert result.exit_code != 0
+
+
+class TestOcrCommand:
+    def test_ocr_to_stdout(self, tmp_path):
+        """Mock ocr_image, check stdout."""
+        img_file = tmp_path / "model.png"
+        img_file.write_bytes(b"\x89PNG" + b"\x00" * 100)
+
+        with patch("md2mip.cli.ocr_image", return_value="# Extracted Model") as mock:
+            runner = CliRunner()
+            result = runner.invoke(cli, ["ocr", str(img_file)])
+            assert result.exit_code == 0
+            assert "Extracted Model" in result.output
+            mock.assert_called_once()
+
+    def test_ocr_to_file(self, tmp_path):
+        """Mock ocr_image, check file written."""
+        img_file = tmp_path / "model.png"
+        img_file.write_bytes(b"\x89PNG" + b"\x00" * 100)
+        out_file = tmp_path / "model.md"
+
+        with patch("md2mip.cli.ocr_image", return_value="# Extracted Model"):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["ocr", str(img_file), "-o", str(out_file)])
+            assert result.exit_code == 0
+            assert out_file.exists()
+            assert "Extracted Model" in out_file.read_text()
+
+    def test_ocr_passes_model_flag(self, tmp_path):
+        """Verify --model forwarded."""
+        img_file = tmp_path / "model.png"
+        img_file.write_bytes(b"\x89PNG" + b"\x00" * 100)
+
+        with patch("md2mip.cli.ocr_image", return_value="# Model") as mock:
+            runner = CliRunner()
+            result = runner.invoke(cli, [
+                "ocr", str(img_file), "--model", "gpt-4o",
+            ])
+            assert result.exit_code == 0
+            mock.assert_called_once_with(str(img_file), model="gpt-4o")
 
 
 class TestRunCommand:

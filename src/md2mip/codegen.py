@@ -241,7 +241,13 @@ def _gen_obj_term(term: str, ir: IR) -> list[str]:
     # Parse: sum(body for idx1 in Set1 for idx2 in Set2)
     m = re.match(r'sum\((.+)\)', term, re.DOTALL)
     if not m:
-        # Scalar term like "K * z[t]" — shouldn't normally appear at top level
+        # Scalar term: bare variable reference like "x" or "c * x[i]"
+        coeff, var_name, var_indices = _parse_product(term, ir)
+        if var_name in ir.variables:
+            offset = _offset_expr(var_name, ir)
+            flat_idx = _flat_index_expr(var_name, var_indices, ir)
+            coeff_c = _coeff_code(coeff, ir)
+            return [f"obj_coeffs[{offset} + {flat_idx}] += {coeff_c}"]
         return [f"# TODO: non-sum objective term: {term}"]
 
     inner = m.group(1).strip()
@@ -325,6 +331,8 @@ def _extract_product(node: ast.expr, ir: IR) -> tuple[str, str, list[str]]:
         vref = _find_var_ref(node, ir)
         if vref:
             return "1", vref[0], vref[1]
+    elif isinstance(node, ast.Name) and node.id in ir.variables:
+        return "1", node.id, []
 
     # Fallback
     return ast.unparse(node), "_unknown", []

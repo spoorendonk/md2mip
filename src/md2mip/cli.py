@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -10,6 +9,9 @@ import click
 
 from md2mip.compiler import compile_to_ir, compile_to_python, run_model
 from md2mip.llm import DEFAULT_MODEL
+from md2mip.ocr import ocr_image
+
+OUT_DIR = Path("out")
 
 
 @click.group()
@@ -33,10 +35,19 @@ def compile(model_path: str, output: str | None, ir_only: bool, model: str):
         result = compile_to_python(markdown, model=model)
 
     if output:
-        Path(output).write_text(result)
+        out_path = Path(output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(result)
         click.echo(f"Written to {output}")
-    else:
+    elif ir_only:
         click.echo(result)
+    else:
+        stem = Path(model_path).stem
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+        out_path = OUT_DIR / f"{stem}_solver.py"
+        out_path.write_text(result)
+        click.echo(f"Written to {out_path}")
+        click.echo(f"Run:    python {out_path} <data.yaml>")
 
 
 @cli.command()
@@ -48,3 +59,18 @@ def run(model_path: str, data: str, model: str):
     markdown = Path(model_path).read_text()
     result = run_model(markdown, data, model=model)
     sys.exit(result.returncode)
+
+
+@cli.command()
+@click.argument("image_path", type=click.Path(exists=True))
+@click.option("-o", "--output", type=click.Path(), default=None, help="Output file path")
+@click.option("--model", default=DEFAULT_MODEL, help=f"LLM model string (default: {DEFAULT_MODEL})")
+def ocr(image_path: str, output: str | None, model: str):
+    """Extract a math model from an image using LLM vision."""
+    result = ocr_image(image_path, model=model)
+
+    if output:
+        Path(output).write_text(result)
+        click.echo(f"Written to {output}")
+    else:
+        click.echo(result)
