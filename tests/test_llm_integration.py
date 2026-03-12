@@ -50,19 +50,28 @@ DATA_FILE_MAP = {
 }
 
 ALL_STANDARD_MODELS = [
-    "transportation", "knapsack", "facility_location",
-    "lot_sizing", "assignment", "blending",
+    "transportation",
+    "knapsack",
+    "facility_location",
+    "lot_sizing",
+    "assignment",
+    "blending",
 ]
 
 NASTY_MODELS = [
-    "nasty_knapsack", "nasty_transport", "nasty_assignment",
-    "nasty_diet", "nasty_misleading", "nasty_trivial",
+    "nasty_knapsack",
+    "nasty_transport",
+    "nasty_assignment",
+    "nasty_diet",
+    "nasty_misleading",
+    "nasty_trivial",
 ]
 
 
 def _try_llm():
     """Check if any LLM provider is available."""
     import os
+
     if os.environ.get("ANTHROPIC_API_KEY"):
         return True
     if os.environ.get("OPENAI_API_KEY"):
@@ -70,6 +79,7 @@ def _try_llm():
     # Check Ollama
     try:
         import urllib.request
+
         urllib.request.urlopen("http://localhost:11434/api/tags", timeout=1)
         return True
     except Exception:
@@ -114,10 +124,17 @@ class TestLLMCompileToIR:
 class TestLLMEndToEnd:
     """Test full pipeline: markdown → LLM → IR → codegen → solve."""
 
-    @pytest.mark.parametrize("model_name", [
-        "transportation", "knapsack", "facility_location",
-        "assignment", "blending",
-    ] + NASTY_MODELS)
+    @pytest.mark.parametrize(
+        "model_name",
+        [
+            "transportation",
+            "knapsack",
+            "facility_location",
+            "assignment",
+            "blending",
+        ]
+        + NASTY_MODELS,
+    )
     def test_solve_correct_optimal(self, model_name):
         markdown = (MODELS_DIR / f"{model_name}.md").read_text()
         code = compile_to_python(markdown)
@@ -130,7 +147,9 @@ class TestLLMEndToEnd:
             f.flush()
             result = subprocess.run(
                 [sys.executable, f.name, str(data_path)],
-                capture_output=True, text=True, timeout=60,
+                capture_output=True,
+                text=True,
+                timeout=60,
             )
 
         assert result.returncode == 0, f"Solver failed:\n{result.stderr}"
@@ -143,9 +162,7 @@ class TestLLMEndToEnd:
         assert obj is not None, f"No objective in output:\n{result.stdout}"
 
         expected = EXPECTED_OPTIMA[model_name]
-        assert abs(obj - expected) < 1.0, (
-            f"{model_name}: expected ~{expected}, got {obj}"
-        )
+        assert abs(obj - expected) < 1.0, f"{model_name}: expected ~{expected}, got {obj}"
 
     def test_lot_sizing_feasible(self):
         markdown = (MODELS_DIR / "lot_sizing.md").read_text()
@@ -157,7 +174,9 @@ class TestLLMEndToEnd:
             f.flush()
             result = subprocess.run(
                 [sys.executable, f.name, str(data_path)],
-                capture_output=True, text=True, timeout=60,
+                capture_output=True,
+                text=True,
+                timeout=60,
             )
 
         assert result.returncode == 0, f"Solver failed:\n{result.stderr}"
@@ -174,10 +193,13 @@ class TestLLMEndToEnd:
 class TestLLMOcr:
     """Test OCR: image → markdown → IR pipeline."""
 
-    @pytest.mark.parametrize("image_name", [
-        "rendered_knapsack.png",
-        "rendered_transport.png",
-    ])
+    @pytest.mark.parametrize(
+        "image_name",
+        [
+            "rendered_knapsack.png",
+            "rendered_transport.png",
+        ],
+    )
     def test_ocr_rendered_then_compile(self, image_name):
         """OCR a rendered-math image, feed result to compile_to_ir, verify valid IR."""
         from md2mip.ocr import ocr_image

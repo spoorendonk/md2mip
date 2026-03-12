@@ -1,4 +1,4 @@
-.PHONY: all test test-llm clean
+.PHONY: all test test-llm lint fmt typecheck clean
 
 -include .env
 export
@@ -12,3 +12,12 @@ test:
 
 test-llm:
 	.venv/bin/pytest tests/ -x -q -m llm
+
+lint:
+	.venv/bin/ruff check src/ tests/
+
+fmt:
+	.venv/bin/ruff format src/ tests/
+
+typecheck:
+	.venv/bin/mypy src/

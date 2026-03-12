@@ -52,7 +52,9 @@ def compile(model_path: str, output: str | None, ir_only: bool, model: str):
 
 @cli.command()
 @click.argument("model_path", type=click.Path(exists=True))
-@click.option("--data", required=True, type=click.Path(exists=True), help="Data file (YAML or JSON)")
+@click.option(
+    "--data", required=True, type=click.Path(exists=True), help="Data file (YAML or JSON)"
+)
 @click.option("--model", default=DEFAULT_MODEL, help=f"LLM model string (default: {DEFAULT_MODEL})")
 def run(model_path: str, data: str, model: str):
     """Compile and immediately run a model with data."""
@@ -78,7 +80,9 @@ def ocr(image_path: str, output: str | None, model: str):
 
 @cli.command()
 @click.argument("model_path", type=click.Path(exists=True))
-@click.option("--data", required=True, type=click.Path(exists=True), help="Data file (YAML or JSON)")
+@click.option(
+    "--data", required=True, type=click.Path(exists=True), help="Data file (YAML or JSON)"
+)
 @click.option("--expect-objective", required=True, type=float, help="Expected objective value")
 @click.option("--tol", default=0.01, type=float, help="Absolute tolerance (default: 0.01)")
 @click.option("--model", default=DEFAULT_MODEL, help=f"LLM model string (default: {DEFAULT_MODEL})")

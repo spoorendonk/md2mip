@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import ast
 import re
+from typing import Literal
+
 from md2mip.ir import IR, Constraint, Variable
 
 
@@ -26,12 +28,6 @@ def generate(ir: IR) -> str:
 # Variable layout helpers
 # ---------------------------------------------------------------------------
 
-def _var_layout(ir: IR) -> list[tuple[str, Variable, str]]:
-    """Return (name, var, offset_expr) for each variable group in flat index order."""
-    layout = []
-    for name, var in ir.variables.items():
-        layout.append((name, var, _offset_expr(name, ir)))
-    return layout
 
 
 def _var_size_expr(var: Variable, ir: IR) -> str:
@@ -44,7 +40,7 @@ def _var_size_expr(var: Variable, ir: IR) -> str:
 
 def _total_vars_expr(ir: IR) -> str:
     parts = []
-    for name, var in ir.variables.items():
+    for _name, var in ir.variables.items():
         parts.append(_var_size_expr(var, ir))
     return " + ".join(parts)
 
@@ -52,6 +48,7 @@ def _total_vars_expr(ir: IR) -> str:
 # ---------------------------------------------------------------------------
 # Code sections
 # ---------------------------------------------------------------------------
+
 
 def _header(ir: IR) -> str:
     return f'''#!/usr/bin/env python3
@@ -71,14 +68,14 @@ VARIABLE_NAMES = {{}}'''
 
 def _load_data(ir: IR) -> str:
     lines = [
-        'def load_data(path: str) -> dict:',
+        "def load_data(path: str) -> dict:",
         '    """Load data from YAML or JSON into numpy arrays."""',
-        '    with open(path) as f:',
+        "    with open(path) as f:",
         '        if path.endswith(".json"):',
-        '            raw = json.load(f)',
-        '        else:',
-        '            raw = yaml.safe_load(f)',
-        '    data = {}',
+        "            raw = json.load(f)",
+        "        else:",
+        "            raw = yaml.safe_load(f)",
+        "    data = {}",
     ]
     for sname in ir.sets:
         lines.append(f'    data["{sname}"] = list(raw["{sname}"])')
@@ -87,38 +84,39 @@ def _load_data(ir: IR) -> str:
             # Handle scalar-in-YAML for indexed params (broadcast to array)
             set_name = param.indices[0]
             lines.append(f'    _v_{pname} = raw["{pname}"]')
-            lines.append(f'    if isinstance(_v_{pname}, (int, float)):')
-            lines.append(f'        data["{pname}"] = np.full(len(data["{set_name}"]), float(_v_{pname}))')
-            lines.append(f'    else:')
+            lines.append(f"    if isinstance(_v_{pname}, (int, float)):")
+            lines.append(
+                f'        data["{pname}"] = np.full(len(data["{set_name}"]), float(_v_{pname}))'
+            )
+            lines.append("    else:")
             lines.append(f'        data["{pname}"] = np.array(_v_{pname}, dtype=np.float64)')
         else:
             if param.default is not None:
                 lines.append(f'    data["{pname}"] = float(raw.get("{pname}", {param.default}))')
             else:
                 lines.append(f'    data["{pname}"] = float(raw["{pname}"])')
-    lines.append('    return data')
+    lines.append("    return data")
     return "\n".join(lines)
 
 
 def _build_model(ir: IR) -> str:
-    lines = ['def build_model(data: dict) -> highspy.Highs:']
+    lines = ["def build_model(data: dict) -> highspy.Highs:"]
 
     # Set sizes
     for sname in ir.sets:
         lines.append(f'    n_{sname.lower()} = len(data["{sname}"])')
 
-    lines.append('')
-    lines.append('    h = highspy.Highs()')
-    lines.append('')
+    lines.append("")
+    lines.append("    h = highspy.Highs()")
+    lines.append("")
 
     # Total variables
     n_vars_expr = _total_vars_expr(ir)
-    lines.append(f'    n_vars = {n_vars_expr}')
-    lines.append('')
+    lines.append(f"    n_vars = {n_vars_expr}")
+    lines.append("")
 
     # Add variables with name tracking
-    layout = _var_layout(ir)
-    for vname, var, _offset in layout:
+    for vname, var in ir.variables.items():
         size_expr = _var_size_expr(var, ir)
         lb = var.lower_bound if var.lower_bound is not None else 0
         ub_val = var.upper_bound
@@ -129,36 +127,44 @@ def _build_model(ir: IR) -> str:
             ub_str = f"np.full({size_expr}, np.inf)"
         else:
             ub_str = f"np.full({size_expr}, {ub_val})"
-        lines.append(f'    # --- Variable: {vname}{_index_comment(var)} ---')
-        lines.append(f'    _col_before = h.getNumCol()')
-        lines.append(f'    h.addVars({size_expr}, {lb_str}, {ub_str})')
-        lines.append(f'    VARIABLE_NAMES.update({{c: "{vname}" for c in range(_col_before, h.getNumCol())}})')
+        lines.append(f"    # --- Variable: {vname}{_index_comment(var)} ---")
+        lines.append("    _col_before = h.getNumCol()")
+        lines.append(f"    h.addVars({size_expr}, {lb_str}, {ub_str})")
+        lines.append(
+            f"    VARIABLE_NAMES.update("
+            f'{{c: "{vname}" for c in range(_col_before, h.getNumCol())}})'
+        )
         if var.type == "binary":
             offset_expr = _offset_expr(vname, ir)
-            lines.append(f'    for _k in range({size_expr}):')
-            lines.append(f'        h.changeColIntegrality({offset_expr} + _k, highspy.HighsVarType.kInteger)')
+            lines.append(f"    for _k in range({size_expr}):")
+            lines.append(
+                f"        h.changeColIntegrality({offset_expr} + _k, highspy.HighsVarType.kInteger)"
+            )
 
-    lines.append('')
+    lines.append("")
 
     # Objective
-    lines.append('    # --- Objective ---')
+    lines.append("    # --- Objective ---")
     obj = ir.objective
     obj_code = _generate_objective(obj.expression, ir)
-    lines.extend(f'    {l}' for l in obj_code)
+    lines.extend(f"    {line}" for line in obj_code)
     sense = "kMinimize" if obj.sense == "minimize" else "kMaximize"
-    lines.append(f'    h.changeObjectiveSense(highspy.ObjSense.{sense})')
-    lines.append('')
+    lines.append(f"    h.changeObjectiveSense(highspy.ObjSense.{sense})")
+    lines.append("")
 
     # Constraint groups with name tracking
     for cname in ir.constraints:
         fn_name = f"setup_{cname}_constraints"
         args = _constraint_fn_args(ir)
-        lines.append(f'    _row_before = h.getNumRow()')
-        lines.append(f'    {fn_name}({args})')
-        lines.append(f'    CONSTRAINT_NAMES.update({{r: "{cname}" for r in range(_row_before, h.getNumRow())}})')
+        lines.append("    _row_before = h.getNumRow()")
+        lines.append(f"    {fn_name}({args})")
+        lines.append(
+            f"    CONSTRAINT_NAMES.update("
+            f'{{r: "{cname}" for r in range(_row_before, h.getNumRow())}})'
+        )
 
-    lines.append('')
-    lines.append('    return h')
+    lines.append("")
+    lines.append("    return h")
     return "\n".join(lines)
 
 
@@ -201,10 +207,11 @@ def _parse_comparison(expr_str: str) -> tuple[str, str, str]:
 # Objective code generation
 # ---------------------------------------------------------------------------
 
+
 def _generate_objective(expr: str, ir: IR) -> list[str]:
     """Generate code to set objective coefficients."""
     lines = []
-    lines.append(f"obj_coeffs = np.zeros(n_vars)")
+    lines.append("obj_coeffs = np.zeros(n_vars)")
 
     # Parse the objective expression to find sum(coeff * var for ...)
     # We handle: sum(p[i]*x[i] ...) and sum(f[i]*y[i] ...) + sum(c[i,j]*x[i,j] ...)
@@ -225,13 +232,13 @@ def _split_top_level_sums(expr: str) -> list[str]:
     i = 0
     while i < len(expr):
         ch = expr[i]
-        if ch == '(':
+        if ch == "(":
             depth += 1
             current.append(ch)
-        elif ch == ')':
+        elif ch == ")":
             depth -= 1
             current.append(ch)
-        elif ch == '+' and depth == 0:
+        elif ch == "+" and depth == 0:
             results.append("".join(current).strip())
             current = []
         else:
@@ -246,7 +253,7 @@ def _gen_obj_term(term: str, ir: IR) -> list[str]:
     """Generate code for one sum(...) term in the objective."""
     lines = []
     # Parse: sum(body for idx1 in Set1 for idx2 in Set2)
-    m = re.match(r'sum\((.+)\)', term, re.DOTALL)
+    m = re.match(r"sum\((.+)\)", term, re.DOTALL)
     if not m:
         # Scalar term: bare variable reference like "x" or "c * x[i]"
         coeff, var_name, var_indices = _parse_product(term, ir)
@@ -276,7 +283,7 @@ def _gen_obj_term(term: str, ir: IR) -> list[str]:
 
     # Generate nested loop
     indent = ""
-    for iv, iset in zip(idx_vars, idx_sets):
+    for iv, iset in zip(idx_vars, idx_sets, strict=True):
         size = f"n_{iset.lower()}"
         lines.append(f"{indent}for {iv} in range({size}):")
         indent += "    "
@@ -291,7 +298,9 @@ def _gen_obj_term(term: str, ir: IR) -> list[str]:
         offset = _offset_expr(var_name, ir)
         flat_idx = _flat_index_expr(var_name, var_indices, ir)
         effective_coeff = coeff_expr if sign == "+" else _negate(coeff_expr)
-        lines.append(f"{indent}obj_coeffs[{offset} + {flat_idx}] += {_coeff_code(effective_coeff, ir)}")
+        lines.append(
+            f"{indent}obj_coeffs[{offset} + {flat_idx}] += {_coeff_code(effective_coeff, ir)}"
+        )
 
     return lines
 
@@ -299,7 +308,7 @@ def _gen_obj_term(term: str, ir: IR) -> list[str]:
 def _split_body_and_iterators(inner: str) -> tuple[str, list[str]]:
     """Split 'coeff * var for i in I for j in J' into body and iterator list."""
     # Find first ' for ' that's not inside brackets
-    parts = re.split(r'\s+for\s+', inner)
+    parts = re.split(r"\s+for\s+", inner)
     body = parts[0]
     iterators = parts[1:]
     return body, iterators
@@ -313,7 +322,7 @@ def _parse_product(body: str, ir: IR) -> tuple[str, str, list[str]]:
     body = body.strip()
 
     # Try to parse as AST
-    tree = ast.parse(body, mode='eval')
+    tree = ast.parse(body, mode="eval")
     node = tree.body
 
     return _extract_product(node, ir)
@@ -375,7 +384,7 @@ def _flat_index_expr(var_name: str, indices: list[str], ir: IR) -> str:
     parts = []
     for k, idx in enumerate(indices):
         if k < len(indices) - 1:
-            suffix = " * ".join(sizes[k + 1:])
+            suffix = " * ".join(sizes[k + 1 :])
             parts.append(f"{idx} * {suffix}")
         else:
             parts.append(idx)
@@ -387,7 +396,7 @@ def _coeff_code(coeff_expr: str, ir: IR) -> str:
     if coeff_expr == "1":
         return "1.0"
     # Replace param references: c[i,j] -> data["c"][i,j], p -> data["p"]
-    tree = ast.parse(coeff_expr, mode='eval')
+    tree = ast.parse(coeff_expr, mode="eval")
     return _coeff_node_to_code(tree.body, ir)
 
 
@@ -406,8 +415,8 @@ def _coeff_node_to_code(node: ast.expr, ir: IR) -> str:
     if isinstance(node, ast.BinOp):
         left = _coeff_node_to_code(node.left, ir)
         right = _coeff_node_to_code(node.right, ir)
-        op_map = {ast.Add: '+', ast.Sub: '-', ast.Mult: '*', ast.Div: '/'}
-        op_str = op_map.get(type(node.op), '+')
+        op_map = {ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/"}
+        op_str = op_map.get(type(node.op), "+")
         return f"({left} {op_str} {right})"
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
         inner = _coeff_node_to_code(node.operand, ir)
@@ -422,6 +431,7 @@ def _coeff_node_to_code(node: ast.expr, ir: IR) -> str:
 # Constraint code generation
 # ---------------------------------------------------------------------------
 
+
 def _constraint_functions(ir: IR) -> list[str]:
     results = []
     for cname, constraint in ir.constraints.items():
@@ -432,7 +442,7 @@ def _constraint_functions(ir: IR) -> list[str]:
 def _gen_constraint_fn(cname: str, constraint: Constraint, ir: IR) -> str:
     params = _constraint_fn_args(ir)
     lines = [
-        f'def setup_{cname}_constraints({params}):',
+        f"def setup_{cname}_constraints({params}):",
         f'    """{constraint.expression}"""',
     ]
 
@@ -480,29 +490,27 @@ def _gen_single_constraint(lhs_str: str, op: str, rhs_str: str, ir: IR) -> list[
     rhs_terms = _extract_linear_terms(rhs_str, ir)
 
     # Move all variable terms to LHS, constant terms to RHS
-    # var_terms: list of (coeff_code, var_name, var_indices, iterators)
-    # const_terms: list of code strings
-    all_var_terms = lhs_terms["var_terms"] + [(_negate(c), v, vi, it) for c, v, vi, it in rhs_terms["var_terms"]]
-    rhs_const = rhs_terms["const_terms"] + [f"-({c})" for c in lhs_terms["const_terms"]]
+    all_var_terms = lhs_terms.var_terms + [t.negated() for t in rhs_terms.var_terms]
+    rhs_const = rhs_terms.const_terms + [f"-({c})" for c in lhs_terms.const_terms]
 
     lines.append("    # Build row as a list of (col_index, coefficient)")
     lines.append("    row_indices = []")
     lines.append("    row_values = []")
 
-    for coeff, vname, vindices, iterators in all_var_terms:
-        offset = _offset_expr(vname, ir)
-        if iterators:
+    for t in all_var_terms:
+        offset = _offset_expr(t.var_name, ir)
+        if t.iterators:
             indent = "    "
-            for iv, iset in iterators:
+            for iv, iset in t.iterators:
                 lines.append(f"{indent}for {iv} in range(n_{iset.lower()}):")
                 indent += "    "
-            flat = _flat_index_expr(vname, vindices, ir)
-            coeff_c = _coeff_code(coeff, ir)
+            flat = _flat_index_expr(t.var_name, t.var_indices, ir)
+            coeff_c = _coeff_code(t.coeff, ir)
             lines.append(f"{indent}row_indices.append({offset} + {flat})")
             lines.append(f"{indent}row_values.append({coeff_c})")
         else:
-            flat = _flat_index_expr(vname, vindices, ir)
-            coeff_c = _coeff_code(coeff, ir)
+            flat = _flat_index_expr(t.var_name, t.var_indices, ir)
+            coeff_c = _coeff_code(t.coeff, ir)
             lines.append(f"    row_indices.append({offset} + {flat})")
             lines.append(f"    row_values.append({coeff_c})")
 
@@ -520,8 +528,15 @@ def _gen_single_constraint(lhs_str: str, op: str, rhs_str: str, ir: IR) -> list[
     return lines
 
 
-def _gen_normal_constraint(cname: str, lhs_str: str, op: str, rhs_str: str,
-                           idx_vars: list[str], idx_sets: list[str], ir: IR) -> list[str]:
+def _gen_normal_constraint(
+    cname: str,
+    lhs_str: str,
+    op: str,
+    rhs_str: str,
+    idx_vars: list[str],
+    idx_sets: list[str],
+    ir: IR,
+) -> list[str]:
     """Generate a constraint group with for_all — one addRows call per iteration."""
     lines = []
 
@@ -534,7 +549,7 @@ def _gen_normal_constraint(cname: str, lhs_str: str, op: str, rhs_str: str,
     lines.append("    starts = [0]")
 
     indent = "    "
-    for iv, iset in zip(idx_vars, idx_sets):
+    for iv, iset in zip(idx_vars, idx_sets, strict=True):
         lines.append(f"{indent}for {iv} in range(n_{iset.lower()}):")
         indent += "    "
 
@@ -542,24 +557,24 @@ def _gen_normal_constraint(cname: str, lhs_str: str, op: str, rhs_str: str,
     lhs_terms = _extract_linear_terms(lhs_str, ir)
     rhs_terms = _extract_linear_terms(rhs_str, ir)
 
-    all_var_terms = lhs_terms["var_terms"] + [(_negate(c), v, vi, it) for c, v, vi, it in rhs_terms["var_terms"]]
-    rhs_const = rhs_terms["const_terms"] + [f"-({c})" for c in lhs_terms["const_terms"]]
+    all_var_terms = lhs_terms.var_terms + [t.negated() for t in rhs_terms.var_terms]
+    rhs_const = rhs_terms.const_terms + [f"-({c})" for c in lhs_terms.const_terms]
 
     lines.append(f"{indent}row_idx = []")
     lines.append(f"{indent}row_val = []")
 
-    for coeff, vname, vindices, iterators in all_var_terms:
-        offset = _offset_expr(vname, ir)
+    for t in all_var_terms:
+        offset = _offset_expr(t.var_name, ir)
         inner_indent = indent
-        if iterators:
+        if t.iterators:
             # Filter out iterators that are already covered by for_all
-            remaining = [(iv, iset) for iv, iset in iterators if iv not in idx_vars]
+            remaining = [(iv, iset) for iv, iset in t.iterators if iv not in idx_vars]
             for iv, iset in remaining:
                 lines.append(f"{inner_indent}for {iv} in range(n_{iset.lower()}):")
                 inner_indent += "    "
 
-        flat = _flat_index_expr(vname, vindices, ir)
-        coeff_c = _coeff_code(coeff, ir)
+        flat = _flat_index_expr(t.var_name, t.var_indices, ir)
+        coeff_c = _coeff_code(t.coeff, ir)
         lines.append(f"{inner_indent}row_idx.append({offset} + {flat})")
         lines.append(f"{inner_indent}row_val.append({coeff_c})")
 
@@ -582,9 +597,15 @@ def _gen_normal_constraint(cname: str, lhs_str: str, op: str, rhs_str: str,
     return lines
 
 
-def _gen_lag_constraint(lhs_str: str, op: str, rhs_str: str,
-                        idx_vars: list[str], idx_sets: list[str],
-                        constraint: Constraint, ir: IR) -> list[str]:
+def _gen_lag_constraint(
+    lhs_str: str,
+    op: str,
+    rhs_str: str,
+    idx_vars: list[str],
+    idx_sets: list[str],
+    constraint: Constraint,
+    ir: IR,
+) -> list[str]:
     """Generate constraints with lag references like Inv[t-1]."""
     lines = []
 
@@ -600,7 +621,7 @@ def _gen_lag_constraint(lhs_str: str, op: str, rhs_str: str,
 
     start_idx = "1" if has_first else "0"
     indent = "    "
-    for iv, iset in zip(idx_vars, idx_sets):
+    for iv, iset in zip(idx_vars, idx_sets, strict=True):
         lines.append(f"{indent}for {iv} in range({start_idx}, n_{iset.lower()}):")
         indent += "    "
 
@@ -613,23 +634,23 @@ def _gen_lag_constraint(lhs_str: str, op: str, rhs_str: str,
     lines.append(f"{indent}row_val = []")
 
     # Parse both sides
-    lhs_terms = _extract_linear_terms_with_lags(lhs_str, ir)
-    rhs_terms = _extract_linear_terms_with_lags(rhs_str, ir)
+    lhs_terms = _extract_linear_terms(lhs_str, ir, mode="with_lags")
+    rhs_terms = _extract_linear_terms(rhs_str, ir, mode="with_lags")
 
-    all_var_terms = lhs_terms["var_terms"] + [(_negate(c), v, vi, it, lag) for c, v, vi, it, lag in rhs_terms["var_terms"]]
-    rhs_const = rhs_terms["const_terms"] + [f"-({c})" for c in lhs_terms["const_terms"]]
+    all_var_terms = lhs_terms.var_terms + [t.negated() for t in rhs_terms.var_terms]
+    rhs_const = rhs_terms.const_terms + [f"-({c})" for c in lhs_terms.const_terms]
 
-    for coeff, vname, vindices, iterators, lag in all_var_terms:
-        offset = _offset_expr(vname, ir)
+    for t in all_var_terms:
+        offset = _offset_expr(t.var_name, ir)
         # Adjust index for lag
         adjusted_indices = []
-        for idx in vindices:
-            if lag and idx == idx_vars[0]:  # primary iterator with lag
-                adjusted_indices.append(f"{idx} - {lag}")
+        for idx in t.var_indices:
+            if t.lag and idx == idx_vars[0]:  # primary iterator with lag
+                adjusted_indices.append(f"{idx} - {t.lag}")
             else:
                 adjusted_indices.append(idx)
-        flat = _flat_index_expr(vname, adjusted_indices, ir)
-        coeff_c = _coeff_code(coeff, ir)
+        flat = _flat_index_expr(t.var_name, adjusted_indices, ir)
+        coeff_c = _coeff_code(t.coeff, ir)
         lines.append(f"{indent}row_idx.append({offset} + {flat})")
         lines.append(f"{indent}row_val.append({coeff_c})")
 
@@ -653,8 +674,9 @@ def _gen_lag_constraint(lhs_str: str, op: str, rhs_str: str,
     return lines
 
 
-def _gen_single_constraint_with_lag(lhs_str: str, op: str, rhs_str: str,
-                                     constraint: Constraint, ir: IR) -> list[str]:
+def _gen_single_constraint_with_lag(
+    lhs_str: str, op: str, rhs_str: str, constraint: Constraint, ir: IR
+) -> list[str]:
     """Generate a single constraint that references specific indices (like t=0)."""
     lines = []
 
@@ -663,16 +685,16 @@ def _gen_single_constraint_with_lag(lhs_str: str, op: str, rhs_str: str,
     lines.append("    row_values = []")
 
     # Parse to find variable references with literal indices
-    lhs_terms = _extract_linear_terms_literal(lhs_str, ir)
-    rhs_terms = _extract_linear_terms_literal(rhs_str, ir)
+    lhs_terms = _extract_linear_terms(lhs_str, ir, mode="literal")
+    rhs_terms = _extract_linear_terms(rhs_str, ir, mode="literal")
 
-    all_var_terms = lhs_terms["var_terms"] + [(_negate(c), v, vi) for c, v, vi in rhs_terms["var_terms"]]
-    rhs_const = rhs_terms["const_terms"] + [f"-({c})" for c in lhs_terms["const_terms"]]
+    all_var_terms = lhs_terms.var_terms + [t.negated() for t in rhs_terms.var_terms]
+    rhs_const = rhs_terms.const_terms + [f"-({c})" for c in lhs_terms.const_terms]
 
-    for coeff, vname, vindices in all_var_terms:
-        offset = _offset_expr(vname, ir)
-        flat = _flat_index_expr(vname, vindices, ir)
-        coeff_c = _coeff_code(coeff, ir)
+    for t in all_var_terms:
+        offset = _offset_expr(t.var_name, ir)
+        flat = _flat_index_expr(t.var_name, t.var_indices, ir)
+        coeff_c = _coeff_code(t.coeff, ir)
         lines.append(f"    row_indices.append({offset} + {flat})")
         lines.append(f"    row_values.append({coeff_c})")
 
@@ -694,108 +716,116 @@ def _gen_single_constraint_with_lag(lhs_str: str, op: str, rhs_str: str,
 # Linear term extraction
 # ---------------------------------------------------------------------------
 
-def _extract_linear_terms(expr_str: str, ir: IR) -> dict:
+
+class LinearTerm:
+    """A single variable term extracted from a linear expression."""
+
+    __slots__ = ("coeff", "var_name", "var_indices", "iterators", "lag")
+
+    def __init__(
+        self,
+        coeff: str,
+        var_name: str,
+        var_indices: list[str],
+        iterators: list[tuple[str, str]] | None = None,
+        lag: int = 0,
+    ):
+        self.coeff = coeff
+        self.var_name = var_name
+        self.var_indices = var_indices
+        self.iterators = iterators or []
+        self.lag = lag
+
+    def negated(self) -> LinearTerm:
+        return LinearTerm(
+            _negate(self.coeff), self.var_name, self.var_indices, self.iterators, self.lag
+        )
+
+
+class ExtractedTerms:
+    """Result of extracting linear terms from an expression."""
+
+    __slots__ = ("var_terms", "const_terms")
+
+    def __init__(self) -> None:
+        self.var_terms: list[LinearTerm] = []
+        self.const_terms: list[str] = []
+
+
+def _extract_linear_terms(
+    expr_str: str, ir: IR, *, mode: Literal["normal", "with_lags", "literal"] = "normal"
+) -> ExtractedTerms:
     """Extract variable terms and constant terms from an expression.
 
-    Returns dict with:
-      var_terms: list of (coeff, var_name, var_indices, iterators)
-      const_terms: list of code strings
+    Modes:
+      "normal"    — handles sum() expressions, parses iterators, lag=0.
+      "with_lags" — no sum() handling, parses lag from indices (e.g. t-1).
+      "literal"   — no sum() handling, no lag parsing, iterators=[].
     """
     expr_str = expr_str.strip()
-    var_terms = []
-    const_terms = []
-
-    # Handle sum(...) expressions
-    sums = _split_additive_terms(expr_str)
-    for sign, term in sums:
-        term = term.strip()
-        m = re.match(r'sum\((.+)\)', term, re.DOTALL)
-        if m:
-            inner = m.group(1)
-            body, iterators = _split_body_and_iterators(inner)
-            parsed_iters = []
-            for it in iterators:
-                parts = it.strip().split(" in ")
-                parsed_iters.append((parts[0].strip(), parts[1].strip()))
-
-            coeff, vname, vindices = _parse_product(body, ir)
-            if vname in ir.variables:
-                effective_coeff = coeff if sign == "+" else _negate(coeff)
-                var_terms.append((effective_coeff, vname, vindices, parsed_iters))
-            else:
-                effective = term if sign == "+" else f"-({term})"
-                const_terms.append(effective)
-        elif _has_var_reference(term, ir):
-            # Direct variable reference like x[i,j] or M * z[t]
-            coeff, vname, vindices = _parse_product(term, ir)
-            if vname in ir.variables:
-                effective_coeff = coeff if sign == "+" else _negate(coeff)
-                var_terms.append((effective_coeff, vname, vindices, []))
-            else:
-                effective = term if sign == "+" else f"-({term})"
-                const_terms.append(effective)
-        else:
-            effective = term if sign == "+" else f"-({term})"
-            const_terms.append(effective)
-
-    return {"var_terms": var_terms, "const_terms": const_terms}
-
-
-def _extract_linear_terms_with_lags(expr_str: str, ir: IR) -> dict:
-    """Like _extract_linear_terms but preserves lag info (t-1)."""
-    expr_str = expr_str.strip()
-    var_terms = []  # (coeff, var_name, var_indices, iterators, lag)
-    const_terms = []
+    result = ExtractedTerms()
 
     sums = _split_additive_terms(expr_str)
     for sign, term in sums:
         term = term.strip()
+
+        # Only "normal" mode handles sum() expressions
+        if mode == "normal":
+            m = re.match(r"sum\((.+)\)", term, re.DOTALL)
+            if m:
+                inner = m.group(1)
+                body, iterators = _split_body_and_iterators(inner)
+                parsed_iters = []
+                for it in iterators:
+                    parts = it.strip().split(" in ")
+                    parsed_iters.append((parts[0].strip(), parts[1].strip()))
+
+                coeff, vname, vindices = _parse_product(body, ir)
+                if vname in ir.variables:
+                    effective_coeff = coeff if sign == "+" else _negate(coeff)
+                    result.var_terms.append(
+                        LinearTerm(effective_coeff, vname, vindices, parsed_iters)
+                    )
+                else:
+                    effective = term if sign == "+" else f"-({term})"
+                    result.const_terms.append(effective)
+                continue
+
         if _has_var_reference(term, ir):
-            coeff, vname, vindices = _parse_product_with_lag(term, ir)
-            if vname in ir.variables:
-                lag = 0
-                new_indices = []
-                for idx in vindices:
-                    m = re.match(r'(\w+)\s*-\s*(\d+)', idx)
-                    if m:
-                        new_indices.append(m.group(1))
-                        lag = int(m.group(2))
-                    else:
-                        new_indices.append(idx)
-                effective_coeff = coeff if sign == "+" else _negate(coeff)
-                var_terms.append((effective_coeff, vname, new_indices, [], lag))
+            if mode == "with_lags":
+                coeff, vname, vindices = _parse_product_with_lag(term, ir)
             else:
-                effective = term if sign == "+" else f"-({term})"
-                const_terms.append(effective)
-        else:
-            effective = term if sign == "+" else f"-({term})"
-            const_terms.append(effective)
+                coeff, vname, vindices = _parse_product(term, ir)
 
-    return {"var_terms": var_terms, "const_terms": const_terms}
-
-
-def _extract_linear_terms_literal(expr_str: str, ir: IR) -> dict:
-    """Extract terms with literal indices (like x[0], d[0])."""
-    expr_str = expr_str.strip()
-    var_terms = []  # (coeff, var_name, var_indices)
-    const_terms = []
-
-    sums = _split_additive_terms(expr_str)
-    for sign, term in sums:
-        term = term.strip()
-        if _has_var_reference(term, ir):
-            coeff, vname, vindices = _parse_product(term, ir)
             if vname in ir.variables:
                 effective_coeff = coeff if sign == "+" else _negate(coeff)
-                var_terms.append((effective_coeff, vname, vindices))
+
+                if mode == "with_lags":
+                    lag = 0
+                    new_indices = []
+                    for idx in vindices:
+                        lag_m = re.match(r"(\w+)\s*-\s*(\d+)", idx)
+                        if lag_m:
+                            new_indices.append(lag_m.group(1))
+                            lag = int(lag_m.group(2))
+                        else:
+                            new_indices.append(idx)
+                    result.var_terms.append(
+                        LinearTerm(effective_coeff, vname, new_indices, [], lag)
+                    )
+                else:
+                    iters: list[tuple[str, str]] = []
+                    result.var_terms.append(
+                        LinearTerm(effective_coeff, vname, vindices, iters)
+                    )
             else:
                 effective = term if sign == "+" else f"-({term})"
-                const_terms.append(effective)
+                result.const_terms.append(effective)
         else:
             effective = term if sign == "+" else f"-({term})"
-            const_terms.append(effective)
+            result.const_terms.append(effective)
 
-    return {"var_terms": var_terms, "const_terms": const_terms}
+    return result
 
 
 def _split_additive_terms(expr: str) -> list[tuple[str, str]]:
@@ -807,15 +837,15 @@ def _split_additive_terms(expr: str) -> list[tuple[str, str]]:
     i = 0
     while i < len(expr):
         ch = expr[i]
-        if ch in '([':
+        if ch in "([":
             depth += 1
             current.append(ch)
-        elif ch in ')]':
+        elif ch in ")]":
             depth -= 1
             current.append(ch)
-        elif (ch == '+' or ch == '-') and depth == 0 and current:
+        elif (ch == "+" or ch == "-") and depth == 0 and current:
             terms.append((sign, "".join(current).strip()))
-            sign = ch if ch == '-' else '+'
+            sign = ch if ch == "-" else "+"
             current = []
         else:
             current.append(ch)
@@ -827,10 +857,7 @@ def _split_additive_terms(expr: str) -> list[tuple[str, str]]:
 
 def _has_var_reference(term: str, ir: IR) -> bool:
     """Check if term references any variable."""
-    for vname in ir.variables:
-        if re.search(rf'\b{re.escape(vname)}\b', term):
-            return True
-    return False
+    return any(re.search(rf"\b{re.escape(vname)}\b", term) for vname in ir.variables)
 
 
 def _parse_product_with_lag(body: str, ir: IR) -> tuple[str, str, list[str]]:
@@ -838,11 +865,11 @@ def _parse_product_with_lag(body: str, ir: IR) -> tuple[str, str, list[str]]:
     body = body.strip()
     # Replace t-1 temporarily for AST parsing: Inv[t-1] isn't valid Python subscript
     # We handle it by regex
-    m = re.match(r'(\w+)\[([^\]]+)\]', body)
+    m = re.match(r"(\w+)\[([^\]]+)\]", body)
     if m:
         name = m.group(1)
         idx_str = m.group(2)
-        indices = [x.strip() for x in idx_str.split(',')]
+        indices = [x.strip() for x in idx_str.split(",")]
         if name in ir.variables:
             return "1", name, indices
     # Try AST-based parsing for products like M * z[t]
@@ -853,13 +880,20 @@ def _parse_product_with_lag(body: str, ir: IR) -> tuple[str, str, list[str]]:
 
 
 def _negate(coeff: str) -> str:
+    """Negate a coefficient expression using AST for correctness."""
     if coeff == "1":
         return "-1"
     if coeff == "-1":
         return "1"
-    if coeff.startswith("-"):
-        return coeff[1:]
-    return f"-({coeff})"
+    try:
+        tree = ast.parse(coeff, mode="eval")
+        node = tree.body
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+            return ast.unparse(node.operand)
+        negated = ast.UnaryOp(op=ast.USub(), operand=node)
+        return ast.unparse(negated)
+    except SyntaxError:
+        return f"-({coeff})"
 
 
 def _bounds_from_op(op: str, rhs_code: str) -> tuple[str, str]:
@@ -880,19 +914,20 @@ def _substitute_params(code: str, ir: IR) -> str:
         if param.indices:
             # Indexed params: c[i,j] -> data["c"][i,j]
             code = re.sub(
-                rf'\b{re.escape(pname)}\[([^\]]+)\]',
+                rf"\b{re.escape(pname)}\[([^\]]+)\]",
                 f'data["{pname}"][\\1]',
                 code,
             )
         else:
             # Scalar params: W -> data["W"]
-            code = re.sub(rf'\b{re.escape(pname)}\b', f'data["{pname}"]', code)
+            code = re.sub(rf"\b{re.escape(pname)}\b", f'data["{pname}"]', code)
     return code
 
 
 # ---------------------------------------------------------------------------
 # Solve + report + main
 # ---------------------------------------------------------------------------
+
 
 def _parse_highs_value_fn() -> str:
     return '''def _parse_highs_value(s):
@@ -912,42 +947,42 @@ def _parse_highs_value_fn() -> str:
 
 def _solve_and_report(ir: IR) -> str:
     lines = [
-        'def solve_and_report(h: highspy.Highs, data: dict, highs_opts=None):',
-        '    if highs_opts:',
-        '        for opt in highs_opts:',
+        "def solve_and_report(h: highspy.Highs, data: dict, highs_opts=None):",
+        "    if highs_opts:",
+        "        for opt in highs_opts:",
         '            name, _, value = opt.partition("=")',
-        '            if not name or not value:',
+        "            if not name or not value:",
         '                sys.exit(f"Invalid --opt format: {opt!r} (expected NAME=VALUE)")',
-        '            h.setOptionValue(name, _parse_highs_value(value))',
-        '    h.run()',
-        '    model_status = h.getModelStatus()',
-        '',
-        '    if model_status == highspy.HighsModelStatus.kInfeasible:',
+        "            h.setOptionValue(name, _parse_highs_value(value))",
+        "    h.run()",
+        "    model_status = h.getModelStatus()",
+        "",
+        "    if model_status == highspy.HighsModelStatus.kInfeasible:",
         '        print("Status: infeasible")',
-        '        _status, iis_data = h.getIis()',
-        '        if _status == highspy.HighsStatus.kOk:',
+        "        _status, iis_data = h.getIis()",
+        "        if _status == highspy.HighsStatus.kOk:",
         '            print("IIS (conflicting constraints):")',
-        '            for row in iis_data.row_index_:',
+        "            for row in iis_data.row_index_:",
         '                name = CONSTRAINT_NAMES.get(row, f"row_{row}")',
         '                print(f"  - {name} (row {row})")',
-        '            for col in iis_data.col_index_:',
+        "            for col in iis_data.col_index_:",
         '                name = VARIABLE_NAMES.get(col, f"col_{col}")',
         '                print(f"  - {name} bound (col {col})")',
-        '        sys.exit(1)',
-        '',
-        '    if model_status != highspy.HighsModelStatus.kOptimal:',
+        "        sys.exit(1)",
+        "",
+        "    if model_status != highspy.HighsModelStatus.kOptimal:",
         '        print(f"Status: {model_status.name}")',
-        '        sys.exit(1)',
-        '',
+        "        sys.exit(1)",
+        "",
         '    obj = h.getInfoValue("objective_function_value")[1]',
-        '    sol = np.array(h.getSolution().col_value)',
-        '',
+        "    sol = np.array(h.getSolution().col_value)",
+        "",
     ]
 
     # Define set sizes in this function too
     for sname in ir.sets:
         lines.append(f'    n_{sname.lower()} = len(data["{sname}"])')
-    lines.append('')
+    lines.append("")
 
     lines.append('    print("Status: optimal")')
     lines.append('    print(f"Objective: {obj:.4f}")')
@@ -961,33 +996,33 @@ def _solve_and_report(ir: IR) -> str:
             set_sizes = [f"n_{s.lower()}" for s in var.indices]
             idx_names = [s.lower() for s in var.indices]
             shape = ", ".join(set_sizes)
-            lines.append(f'    {vname}_sol = sol[{offset}:{offset} + {size_expr}].reshape({shape})')
+            lines.append(f"    {vname}_sol = sol[{offset}:{offset} + {size_expr}].reshape({shape})")
 
             # Nested loop to print nonzero values
             indent = "    "
-            for idx, sname in zip(idx_names, var.indices):
-                lines.append(f'{indent}for {idx} in range(n_{sname.lower()}):')
+            for idx, sname in zip(idx_names, var.indices, strict=True):
+                lines.append(f"{indent}for {idx} in range(n_{sname.lower()}):")
                 indent += "    "
 
             idx_str = ", ".join(idx_names)
             # Build label with string concatenation to avoid nested f-string issues
             label_parts = []
-            for idx, sname in zip(idx_names, var.indices):
+            for idx, sname in zip(idx_names, var.indices, strict=True):
                 label_parts.append(f'str(data["{sname}"][{idx}])')
             label_expr = ' + "," + '.join(label_parts)
-            lines.append(f'{indent}val = {vname}_sol[{idx_str}]')
-            lines.append(f'{indent}if abs(val) > 1e-6:')
-            lines.append(f'{indent}    label = {label_expr}')
+            lines.append(f"{indent}val = {vname}_sol[{idx_str}]")
+            lines.append(f"{indent}if abs(val) > 1e-6:")
+            lines.append(f"{indent}    label = {label_expr}")
             lines.append(f'{indent}    print(f"  {vname}[{{label}}] = {{val:.4f}}")')
         else:
-            lines.append(f'    val = sol[{offset}]')
+            lines.append(f"    val = sol[{offset}]")
             lines.append(f'    print(f"  {vname} = {{val:.4f}}")')
 
     return "\n".join(lines)
 
 
 def _main() -> str:
-    return '''if __name__ == "__main__":
+    return """if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("data", help="Path to data file (YAML or JSON)")
     parser.add_argument("--opt", action="append", default=[],
@@ -996,4 +1031,4 @@ def _main() -> str:
 
     data = load_data(args.data)
     h = build_model(data)
-    solve_and_report(h, data, highs_opts=args.opt)'''
+    solve_and_report(h, data, highs_opts=args.opt)"""
