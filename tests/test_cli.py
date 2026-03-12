@@ -1,5 +1,6 @@
 """CLI smoke tests."""
 
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 from click.testing import CliRunner
 
@@ -9,7 +10,7 @@ from tests.conftest import load_fixture
 
 class TestCompileCommand:
     def test_compile_ir_only(self, tmp_path):
-        """Test --ir-only flag with mocked LLM."""
+        """Test --ir-only flag outputs to stdout."""
         fixture = load_fixture("transportation")
         model_file = tmp_path / "model.md"
         model_file.write_text("# Test model")
@@ -22,8 +23,29 @@ class TestCompileCommand:
             assert result.exit_code == 0
             assert '"transportation"' in result.output
 
+    def test_compile_default_writes_to_out_dir(self, tmp_path):
+        """Without -o, compile writes to out/<stem>_solver.py."""
+        fixture = load_fixture("transportation")
+        model_file = tmp_path / "mymodel.md"
+        model_file.write_text("# Test model")
+        out_dir = tmp_path / "out"
+
+        with (
+            patch("md2mip.compiler.parse_model", return_value=fixture),
+            patch("md2mip.cli.OUT_DIR", out_dir),
+        ):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["compile", str(model_file)])
+
+        assert result.exit_code == 0
+        out_file = out_dir / "mymodel_solver.py"
+        assert out_file.exists()
+        assert "import highspy" in out_file.read_text()
+        assert "Written to" in result.output
+        assert "Run:" in result.output
+
     def test_compile_to_file(self, tmp_path):
-        """Test -o flag."""
+        """Test -o flag writes to explicit path."""
         fixture = load_fixture("transportation")
         model_file = tmp_path / "model.md"
         model_file.write_text("# Test model")
@@ -38,7 +60,6 @@ class TestCompileCommand:
             assert out_file.exists()
             content = out_file.read_text()
             assert "import highspy" in content
-
 
     def test_compile_passes_model_flag(self, tmp_path):
         """Test --model flag is forwarded to LLM."""

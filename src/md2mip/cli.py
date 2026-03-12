@@ -11,6 +11,8 @@ from md2mip.compiler import compile_to_ir, compile_to_python, run_model
 from md2mip.llm import DEFAULT_MODEL
 from md2mip.ocr import ocr_image
 
+OUT_DIR = Path("out")
+
 
 @click.group()
 def cli():
@@ -33,10 +35,19 @@ def compile(model_path: str, output: str | None, ir_only: bool, model: str):
         result = compile_to_python(markdown, model=model)
 
     if output:
-        Path(output).write_text(result)
+        out_path = Path(output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(result)
         click.echo(f"Written to {output}")
-    else:
+    elif ir_only:
         click.echo(result)
+    else:
+        stem = Path(model_path).stem
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+        out_path = OUT_DIR / f"{stem}_solver.py"
+        out_path.write_text(result)
+        click.echo(f"Written to {out_path}")
+        click.echo(f"Run:    python {out_path} <data.yaml>")
 
 
 @cli.command()
