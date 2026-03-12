@@ -1,7 +1,7 @@
 """CLI smoke tests."""
 
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
 from click.testing import CliRunner
 
 from md2mip.cli import cli
@@ -17,9 +17,14 @@ class TestCompileCommand:
 
         with patch("md2mip.compiler.parse_model", return_value=fixture):
             runner = CliRunner()
-            result = runner.invoke(cli, [
-                "compile", str(model_file), "--ir-only",
-            ])
+            result = runner.invoke(
+                cli,
+                [
+                    "compile",
+                    str(model_file),
+                    "--ir-only",
+                ],
+            )
             assert result.exit_code == 0
             assert '"transportation"' in result.output
 
@@ -53,9 +58,15 @@ class TestCompileCommand:
 
         with patch("md2mip.compiler.parse_model", return_value=fixture):
             runner = CliRunner()
-            result = runner.invoke(cli, [
-                "compile", str(model_file), "-o", str(out_file),
-            ])
+            result = runner.invoke(
+                cli,
+                [
+                    "compile",
+                    str(model_file),
+                    "-o",
+                    str(out_file),
+                ],
+            )
             assert result.exit_code == 0
             assert out_file.exists()
             content = out_file.read_text()
@@ -69,10 +80,16 @@ class TestCompileCommand:
 
         with patch("md2mip.compiler.parse_model", return_value=fixture) as mock:
             runner = CliRunner()
-            result = runner.invoke(cli, [
-                "compile", str(model_file), "--ir-only",
-                "--model", "ollama/qwen3",
-            ])
+            result = runner.invoke(
+                cli,
+                [
+                    "compile",
+                    str(model_file),
+                    "--ir-only",
+                    "--model",
+                    "ollama/qwen3",
+                ],
+            )
             assert result.exit_code == 0
             mock.assert_called_once()
             assert mock.call_args[1]["model"] == "ollama/qwen3"
@@ -80,14 +97,20 @@ class TestCompileCommand:
     def test_compile_llm_error(self, tmp_path):
         """Test graceful error when LLM fails."""
         from md2mip.llm import LLMError
+
         model_file = tmp_path / "model.md"
         model_file.write_text("# Test model")
 
         with patch("md2mip.compiler.parse_model", side_effect=LLMError("API down")):
             runner = CliRunner()
-            result = runner.invoke(cli, [
-                "compile", str(model_file), "--ir-only",
-            ])
+            result = runner.invoke(
+                cli,
+                [
+                    "compile",
+                    str(model_file),
+                    "--ir-only",
+                ],
+            )
             assert result.exit_code != 0
 
 
@@ -124,9 +147,15 @@ class TestOcrCommand:
 
         with patch("md2mip.cli.ocr_image", return_value="# Model") as mock:
             runner = CliRunner()
-            result = runner.invoke(cli, [
-                "ocr", str(img_file), "--model", "gpt-4o",
-            ])
+            result = runner.invoke(
+                cli,
+                [
+                    "ocr",
+                    str(img_file),
+                    "--model",
+                    "gpt-4o",
+                ],
+            )
             assert result.exit_code == 0
             mock.assert_called_once_with(str(img_file), model="gpt-4o")
 
@@ -141,13 +170,20 @@ class TestValidateCommand:
         # validate_model calls compile_to_python which calls parse_model
         with patch("md2mip.compiler.parse_model", return_value=fixture):
             from tests.conftest import DATA_DIR
+
             data_path = DATA_DIR / "transportation.yaml"
             runner = CliRunner()
-            result = runner.invoke(cli, [
-                "validate", str(model_file),
-                "--data", str(data_path),
-                "--expect-objective", "215",
-            ])
+            result = runner.invoke(
+                cli,
+                [
+                    "validate",
+                    str(model_file),
+                    "--data",
+                    str(data_path),
+                    "--expect-objective",
+                    "215",
+                ],
+            )
             assert result.exit_code == 0, f"Output: {result.output}"
             assert "PASS" in result.output
 
@@ -159,13 +195,20 @@ class TestValidateCommand:
 
         with patch("md2mip.compiler.parse_model", return_value=fixture):
             from tests.conftest import DATA_DIR
+
             data_path = DATA_DIR / "transportation.yaml"
             runner = CliRunner()
-            result = runner.invoke(cli, [
-                "validate", str(model_file),
-                "--data", str(data_path),
-                "--expect-objective", "999",
-            ])
+            result = runner.invoke(
+                cli,
+                [
+                    "validate",
+                    str(model_file),
+                    "--data",
+                    str(data_path),
+                    "--expect-objective",
+                    "999",
+                ],
+            )
             assert result.exit_code == 1
             assert "FAIL" in result.output
 

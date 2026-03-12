@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
@@ -144,16 +144,12 @@ class IR:
         for pname, p in self.parameters.items():
             for idx in p.indices:
                 if idx not in known_sets:
-                    raise ValueError(
-                        f"Parameter {pname!r}: index {idx!r} is not a known set"
-                    )
+                    raise ValueError(f"Parameter {pname!r}: index {idx!r} is not a known set")
         # Check variable indices reference known sets
         for vname, v in self.variables.items():
             for idx in v.indices:
                 if idx not in known_sets:
-                    raise ValueError(
-                        f"Variable {vname!r}: index {idx!r} is not a known set"
-                    )
+                    raise ValueError(f"Variable {vname!r}: index {idx!r} is not a known set")
         # Check constraint expressions contain a comparison operator
         for cname, c in self.constraints.items():
             expr = c.expression

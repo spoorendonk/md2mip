@@ -82,7 +82,7 @@ class TestOcr:
 
         with (
             patch("md2mip.ocr.litellm.completion", side_effect=side_effects),
-            patch("md2mip.ocr.time.sleep"),
+            patch("md2mip.retry.time.sleep"),
         ):
             result = ocr_image(str(img))
 

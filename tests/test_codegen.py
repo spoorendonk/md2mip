@@ -1,20 +1,28 @@
 """Tests for code generation."""
 
 import ast as python_ast
+
 import pytest
 
-from md2mip.ir import IR
 from md2mip.codegen import generate
+from md2mip.ir import IR
 from tests.conftest import load_fixture
 
 
 class TestCodegenSyntax:
     """Generated code should be valid Python."""
 
-    @pytest.mark.parametrize("name", [
-        "transportation", "knapsack", "facility_location",
-        "assignment", "blending", "lot_sizing",
-    ])
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "transportation",
+            "knapsack",
+            "facility_location",
+            "assignment",
+            "blending",
+            "lot_sizing",
+        ],
+    )
     def test_generates_valid_python(self, name):
         raw = load_fixture(name)
         ir = IR.from_dict(raw)
@@ -22,10 +30,17 @@ class TestCodegenSyntax:
         # Should parse as valid Python
         python_ast.parse(code)
 
-    @pytest.mark.parametrize("name", [
-        "transportation", "knapsack", "facility_location",
-        "assignment", "blending", "lot_sizing",
-    ])
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "transportation",
+            "knapsack",
+            "facility_location",
+            "assignment",
+            "blending",
+            "lot_sizing",
+        ],
+    )
     def test_has_required_functions(self, name):
         raw = load_fixture(name)
         ir = IR.from_dict(raw)
@@ -35,10 +50,17 @@ class TestCodegenSyntax:
         assert "def solve_and_report(" in code
         assert 'if __name__ == "__main__"' in code
 
-    @pytest.mark.parametrize("name", [
-        "transportation", "knapsack", "facility_location",
-        "assignment", "blending", "lot_sizing",
-    ])
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "transportation",
+            "knapsack",
+            "facility_location",
+            "assignment",
+            "blending",
+            "lot_sizing",
+        ],
+    )
     def test_has_constraint_functions(self, name):
         raw = load_fixture(name)
         ir = IR.from_dict(raw)

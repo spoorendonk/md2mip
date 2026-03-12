@@ -1,10 +1,9 @@
 """Tests for IR dataclasses."""
 
-import json
 import pytest
 
-from md2mip.ir import IR, SetDef, Parameter, Variable, Objective, Constraint
-from tests.conftest import load_fixture, FIXTURES_DIR
+from md2mip.ir import IR, Constraint, Objective, Parameter, SetDef, Variable
+from tests.conftest import load_fixture
 
 
 class TestIRFromDict:
@@ -118,10 +117,17 @@ class TestIRValidation:
 
 
 class TestAllFixturesValid:
-    @pytest.mark.parametrize("name", [
-        "transportation", "knapsack", "facility_location",
-        "lot_sizing", "assignment", "blending",
-    ])
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "transportation",
+            "knapsack",
+            "facility_location",
+            "lot_sizing",
+            "assignment",
+            "blending",
+        ],
+    )
     def test_fixture_validates(self, name):
         raw = load_fixture(name)
         ir = IR.from_dict(raw)

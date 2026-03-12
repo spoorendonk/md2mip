@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import base64
 import mimetypes
-import time
 from pathlib import Path
 
 import litellm
 
-from md2mip.llm import DEFAULT_MODEL, MAX_RETRIES, RETRY_BACKOFF, LLMError
+from md2mip.llm import DEFAULT_MODEL
+from md2mip.retry import litellm_retry
 
 SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
@@ -49,8 +49,7 @@ def ocr_image(image_path: str, model: str = DEFAULT_MODEL) -> str:
     ext = path.suffix.lower()
     if ext not in SUPPORTED_EXTENSIONS:
         raise ValueError(
-            f"Unsupported image format: {ext}. "
-            f"Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
+            f"Unsupported image format: {ext}. Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
         )
 
     mime = mimetypes.guess_type(str(path))[0] or f"image/{ext.lstrip('.')}"
@@ -67,35 +66,23 @@ def ocr_image(image_path: str, model: str = DEFAULT_MODEL) -> str:
                 },
                 {
                     "type": "text",
-                    "text": "Extract the mathematical model from this image into clean markdown with LaTeX notation.",
+                    "text": (
+                        "Extract the mathematical model from this image"
+                        " into clean markdown with LaTeX notation."
+                    ),
                 },
             ],
         },
     ]
 
-    last_err = None
-    for attempt in range(MAX_RETRIES):
-        try:
-            response = litellm.completion(
-                model=model,
-                messages=messages,
-                temperature=0,
-                max_tokens=4096,
-            )
-            break
-        except litellm.RateLimitError as e:
-            last_err = e
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(RETRY_BACKOFF * (attempt + 1))
-                continue
-            raise LLMError(
-                f"LLM rate limited after {MAX_RETRIES} retries ({model}): {e}"
-            ) from e
-        except Exception as e:
-            raise LLMError(f"LLM API call failed ({model}): {e}") from e
-    else:
-        raise LLMError(
-            f"LLM rate limited after {MAX_RETRIES} retries ({model}): {last_err}"
-        ) from last_err
+    response = litellm_retry(
+        lambda: litellm.completion(
+            model=model,
+            messages=messages,
+            temperature=0,
+            max_tokens=4096,
+        ),
+        model=model,
+    )
 
-    return response.choices[0].message.content.strip()
+    return response.choices[0].message.content.strip()  # type: ignore[no-any-return,union-attr]

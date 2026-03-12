@@ -7,13 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from md2mip.ir import IR
 from md2mip.codegen import generate
-from tests.conftest import load_fixture, DATA_DIR
+from md2mip.ir import IR
+from tests.conftest import DATA_DIR, load_fixture
 
 
-def _run_generated(fixture_name: str, data_name: str | None = None,
-                    extra_args: list[str] | None = None) -> tuple[int, str, str]:
+def _run_generated(
+    fixture_name: str, data_name: str | None = None, extra_args: list[str] | None = None
+) -> tuple[int, str, str]:
     """Generate code from fixture, run with data, return (returncode, stdout, stderr)."""
     raw = load_fixture(fixture_name)
     ir = IR.from_dict(raw)
@@ -32,7 +33,9 @@ def _run_generated(fixture_name: str, data_name: str | None = None,
             cmd.extend(extra_args)
         result = subprocess.run(
             cmd,
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
     return result.returncode, result.stdout, result.stderr
 
@@ -117,8 +120,9 @@ class TestInfeasible:
 class TestValidateEndToEnd:
     def test_validate_transportation(self):
         """Full validate pipeline through validate_model()."""
-        from md2mip.compiler import validate_model
         from unittest.mock import patch
+
+        from md2mip.compiler import validate_model
 
         raw = load_fixture("transportation")
         data_path = DATA_DIR / "transportation.yaml"
@@ -139,8 +143,12 @@ class TestHiGHSOptions:
         try:
             rc, stdout, stderr = _run_generated(
                 "transportation",
-                extra_args=["--opt", "write_model_to_file=true",
-                            "--opt", f"write_model_file={mps_path}"],
+                extra_args=[
+                    "--opt",
+                    "write_model_to_file=true",
+                    "--opt",
+                    f"write_model_file={mps_path}",
+                ],
             )
             # write_model_to_file causes HiGHS to write the model without solving,
             # so the script exits 1 (status kNotset). Just check the file was written.

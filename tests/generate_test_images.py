@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
@@ -27,6 +28,7 @@ MODELS_DIR = TESTS_DIR.parent / "models"
 # ---------------------------------------------------------------------------
 # Plain text images (Pillow) — raw markdown as monospace
 # ---------------------------------------------------------------------------
+
 
 def render_text_to_image(
     text: str,
@@ -83,6 +85,7 @@ def render_text_to_image(
 # Rendered math images (matplotlib) — proper math notation
 # ---------------------------------------------------------------------------
 
+
 def _parse_markdown_blocks(md: str) -> list[dict]:
     """Parse markdown into a sequence of typed blocks for rendering.
 
@@ -134,11 +137,10 @@ def _parse_markdown_blocks(md: str) -> list[dict]:
     return blocks
 
 
-def _render_inline(ax, x: float, y: float, text: str, fontsize: float,
-                   transform) -> None:
+def _render_inline(ax, x: float, y: float, text: str, fontsize: float, transform) -> None:
     """Render text that may contain inline $...$ math."""
     # Split on $...$ but not $$
-    parts = re.split(r'(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)', text)
+    parts = re.split(r"(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)", text)
     # parts alternates: [text, math, text, math, ...]
     segments = []
     for j, part in enumerate(parts):
@@ -149,8 +151,15 @@ def _render_inline(ax, x: float, y: float, text: str, fontsize: float,
             segments.append(f"${part}$")
 
     joined = "".join(segments)
-    ax.text(x, y, joined, fontsize=fontsize, transform=transform,
-            verticalalignment="top", family="serif")
+    ax.text(
+        x,
+        y,
+        joined,
+        fontsize=fontsize,
+        transform=transform,
+        verticalalignment="top",
+        family="serif",
+    )
 
 
 def render_markdown_to_image(
@@ -190,34 +199,51 @@ def render_markdown_to_image(
         elif btype == "header":
             level = block["level"]
             fs = font_sizes.get(level, 12)
-            ax.text(margin, y, block["text"], fontsize=fs, fontweight="bold",
-                    transform=ax.transAxes, verticalalignment="top",
-                    family="serif")
+            ax.text(
+                margin,
+                y,
+                block["text"],
+                fontsize=fs,
+                fontweight="bold",
+                transform=ax.transAxes,
+                verticalalignment="top",
+                family="serif",
+            )
             y -= step_text * 1.3
         elif btype == "display_math":
             math_str = f"${block['math']}$"
-            ax.text(0.5, y, math_str, fontsize=14, ha="center",
-                    transform=ax.transAxes, verticalalignment="top",
-                    family="serif")
+            ax.text(
+                0.5,
+                y,
+                math_str,
+                fontsize=14,
+                ha="center",
+                transform=ax.transAxes,
+                verticalalignment="top",
+                family="serif",
+            )
             y -= step_text * 1.8
         elif btype == "bullet":
-            _render_inline(ax, margin + 0.02, y, f"\u2022  {block['text']}",
-                           fontsize=11, transform=ax.transAxes)
+            _render_inline(
+                ax,
+                margin + 0.02,
+                y,
+                f"\u2022  {block['text']}",
+                fontsize=11,
+                transform=ax.transAxes,
+            )
             y -= step_text
         elif btype == "table_row":
             text = block["text"]
             if sep_re.match(text):
                 continue  # skip separator rows
-            _render_inline(ax, margin, y, text, fontsize=10,
-                           transform=ax.transAxes)
+            _render_inline(ax, margin, y, text, fontsize=10, transform=ax.transAxes)
             y -= step_text * 0.9
         elif btype == "text":
-            _render_inline(ax, margin, y, block["text"], fontsize=11,
-                           transform=ax.transAxes)
+            _render_inline(ax, margin, y, block["text"], fontsize=11, transform=ax.transAxes)
             y -= step_text
 
-    fig.savefig(output_path, dpi=dpi, bbox_inches="tight", facecolor="white",
-                pad_inches=0.2)
+    fig.savefig(output_path, dpi=dpi, bbox_inches="tight", facecolor="white", pad_inches=0.2)
     plt.close(fig)
     print(f"  Generated (rendered): {output_path.name}")
 
@@ -225,6 +251,7 @@ def render_markdown_to_image(
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main():
     IMAGES_DIR.mkdir(exist_ok=True)
@@ -236,8 +263,10 @@ def main():
     render_text_to_image(knapsack_md, IMAGES_DIR / "clean_knapsack.png")
     render_text_to_image(transport_md, IMAGES_DIR / "clean_transport.png")
     render_text_to_image(
-        transport_md, IMAGES_DIR / "noisy_transport.png",
-        noise=True, rotation=1.5,
+        transport_md,
+        IMAGES_DIR / "noisy_transport.png",
+        noise=True,
+        rotation=1.5,
     )
 
     # Rendered math images (proper notation via matplotlib)
