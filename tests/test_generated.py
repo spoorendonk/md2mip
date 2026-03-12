@@ -101,6 +101,37 @@ class TestBlending:
 
 
 @pytest.mark.solver
+class TestInfeasible:
+    def test_infeasible_exit_code(self):
+        rc, stdout, stderr = _run_generated("transportation", data_name="transportation_infeasible")
+        assert rc == 1
+
+    def test_infeasible_reports_iis(self):
+        rc, stdout, stderr = _run_generated("transportation", data_name="transportation_infeasible")
+        assert rc == 1
+        assert "infeasible" in stdout.lower()
+        assert "IIS" in stdout
+
+
+@pytest.mark.solver
+class TestValidateEndToEnd:
+    def test_validate_transportation(self):
+        """Full validate pipeline through validate_model()."""
+        from md2mip.compiler import validate_model
+        from unittest.mock import patch
+
+        raw = load_fixture("transportation")
+        data_path = DATA_DIR / "transportation.yaml"
+
+        with patch("md2mip.compiler.parse_model", return_value=raw):
+            passed, actual, stdout = validate_model(
+                "# dummy markdown", str(data_path), expected_obj=215.0
+            )
+        assert passed, f"Expected PASS, got actual={actual}\n{stdout}"
+        assert abs(actual - 215.0) < 0.01
+
+
+@pytest.mark.solver
 class TestHiGHSOptions:
     def test_write_model_mps(self):
         with tempfile.NamedTemporaryFile(suffix=".mps", delete=False) as mps:
@@ -111,7 +142,8 @@ class TestHiGHSOptions:
                 extra_args=["--opt", "write_model_to_file=true",
                             "--opt", f"write_model_file={mps_path}"],
             )
-            assert rc == 0, f"Script failed:\n{stderr}"
+            # write_model_to_file causes HiGHS to write the model without solving,
+            # so the script exits 1 (status kNotset). Just check the file was written.
             assert Path(mps_path).stat().st_size > 0
         finally:
             Path(mps_path).unlink(missing_ok=True)

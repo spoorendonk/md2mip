@@ -41,3 +41,35 @@ def run_model(markdown: str, data_path: str, model: str = DEFAULT_MODEL) -> subp
             [sys.executable, f.name, data_path],
             capture_output=False,
         )
+
+
+def validate_model(
+    markdown: str,
+    data_path: str,
+    expected_obj: float,
+    tol: float = 0.01,
+    model: str = DEFAULT_MODEL,
+) -> tuple[bool, float | None, str]:
+    """Compile, run, check objective. Returns (passed, actual, stdout)."""
+    code = compile_to_python(markdown, model=model)
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=True) as f:
+        f.write(code)
+        f.flush()
+        result = subprocess.run(
+            [sys.executable, f.name, data_path],
+            capture_output=True, text=True, timeout=60,
+        )
+    if result.returncode != 0:
+        return False, None, result.stdout + result.stderr
+
+    actual = None
+    for line in result.stdout.splitlines():
+        if line.startswith("Objective:"):
+            actual = float(line.split(":")[1].strip())
+            break
+
+    if actual is None:
+        return False, None, result.stdout
+
+    passed = abs(actual - expected_obj) < tol
+    return passed, actual, result.stdout

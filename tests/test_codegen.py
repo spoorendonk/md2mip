@@ -87,3 +87,31 @@ class TestCodegenStructure:
         ir = IR.from_dict(raw)
         code = generate(ir)
         assert "h.silent()" not in code
+
+    def test_has_constraint_names_dict(self):
+        raw = load_fixture("transportation")
+        ir = IR.from_dict(raw)
+        code = generate(ir)
+        assert "CONSTRAINT_NAMES" in code
+        assert "CONSTRAINT_NAMES = {}" in code
+
+    def test_has_variable_names_dict(self):
+        raw = load_fixture("transportation")
+        ir = IR.from_dict(raw)
+        code = generate(ir)
+        assert "VARIABLE_NAMES" in code
+        assert "VARIABLE_NAMES = {}" in code
+
+    def test_uses_model_status(self):
+        raw = load_fixture("transportation")
+        ir = IR.from_dict(raw)
+        code = generate(ir)
+        assert "getModelStatus" in code
+        assert "primal_solution_status" not in code
+
+    def test_has_iis_handling(self):
+        raw = load_fixture("transportation")
+        ir = IR.from_dict(raw)
+        code = generate(ir)
+        assert "getIis" in code
+        assert "kInfeasible" in code

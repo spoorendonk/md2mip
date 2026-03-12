@@ -131,6 +131,45 @@ class TestOcrCommand:
             mock.assert_called_once_with(str(img_file), model="gpt-4o")
 
 
+class TestValidateCommand:
+    def test_validate_pass(self, tmp_path):
+        """Mock LLM, run validate with correct expected objective, exit 0."""
+        fixture = load_fixture("transportation")
+        model_file = tmp_path / "model.md"
+        model_file.write_text("# Test model")
+
+        # validate_model calls compile_to_python which calls parse_model
+        with patch("md2mip.compiler.parse_model", return_value=fixture):
+            from tests.conftest import DATA_DIR
+            data_path = DATA_DIR / "transportation.yaml"
+            runner = CliRunner()
+            result = runner.invoke(cli, [
+                "validate", str(model_file),
+                "--data", str(data_path),
+                "--expect-objective", "215",
+            ])
+            assert result.exit_code == 0, f"Output: {result.output}"
+            assert "PASS" in result.output
+
+    def test_validate_fail(self, tmp_path):
+        """Mock LLM, run validate with wrong expected objective, exit 1."""
+        fixture = load_fixture("transportation")
+        model_file = tmp_path / "model.md"
+        model_file.write_text("# Test model")
+
+        with patch("md2mip.compiler.parse_model", return_value=fixture):
+            from tests.conftest import DATA_DIR
+            data_path = DATA_DIR / "transportation.yaml"
+            runner = CliRunner()
+            result = runner.invoke(cli, [
+                "validate", str(model_file),
+                "--data", str(data_path),
+                "--expect-objective", "999",
+            ])
+            assert result.exit_code == 1
+            assert "FAIL" in result.output
+
+
 class TestRunCommand:
     def test_run_requires_data(self):
         runner = CliRunner()

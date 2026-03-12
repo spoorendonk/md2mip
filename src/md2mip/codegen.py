@@ -63,7 +63,10 @@ import sys
 
 import highspy
 import numpy as np
-import yaml'''
+import yaml
+
+CONSTRAINT_NAMES = {{}}
+VARIABLE_NAMES = {{}}'''
 
 
 def _load_data(ir: IR) -> str:
@@ -113,7 +116,7 @@ def _build_model(ir: IR) -> str:
     lines.append(f'    n_vars = {n_vars_expr}')
     lines.append('')
 
-    # Add variables
+    # Add variables with name tracking
     layout = _var_layout(ir)
     for vname, var, _offset in layout:
         size_expr = _var_size_expr(var, ir)
@@ -127,7 +130,9 @@ def _build_model(ir: IR) -> str:
         else:
             ub_str = f"np.full({size_expr}, {ub_val})"
         lines.append(f'    # --- Variable: {vname}{_index_comment(var)} ---')
+        lines.append(f'    _col_before = h.getNumCol()')
         lines.append(f'    h.addVars({size_expr}, {lb_str}, {ub_str})')
+        lines.append(f'    VARIABLE_NAMES.update({{c: "{vname}" for c in range(_col_before, h.getNumCol())}})')
         if var.type == "binary":
             offset_expr = _offset_expr(vname, ir)
             lines.append(f'    for _k in range({size_expr}):')
@@ -144,11 +149,13 @@ def _build_model(ir: IR) -> str:
     lines.append(f'    h.changeObjectiveSense(highspy.ObjSense.{sense})')
     lines.append('')
 
-    # Constraint groups
+    # Constraint groups with name tracking
     for cname in ir.constraints:
         fn_name = f"setup_{cname}_constraints"
         args = _constraint_fn_args(ir)
+        lines.append(f'    _row_before = h.getNumRow()')
         lines.append(f'    {fn_name}({args})')
+        lines.append(f'    CONSTRAINT_NAMES.update({{r: "{cname}" for r in range(_row_before, h.getNumRow())}})')
 
     lines.append('')
     lines.append('    return h')
@@ -913,7 +920,25 @@ def _solve_and_report(ir: IR) -> str:
         '                sys.exit(f"Invalid --opt format: {opt!r} (expected NAME=VALUE)")',
         '            h.setOptionValue(name, _parse_highs_value(value))',
         '    h.run()',
-        '    status = h.getInfoValue("primal_solution_status")[1]',
+        '    model_status = h.getModelStatus()',
+        '',
+        '    if model_status == highspy.HighsModelStatus.kInfeasible:',
+        '        print("Status: infeasible")',
+        '        _status, iis_data = h.getIis()',
+        '        if _status == highspy.HighsStatus.kOk:',
+        '            print("IIS (conflicting constraints):")',
+        '            for row in iis_data.row_index_:',
+        '                name = CONSTRAINT_NAMES.get(row, f"row_{row}")',
+        '                print(f"  - {name} (row {row})")',
+        '            for col in iis_data.col_index_:',
+        '                name = VARIABLE_NAMES.get(col, f"col_{col}")',
+        '                print(f"  - {name} bound (col {col})")',
+        '        sys.exit(1)',
+        '',
+        '    if model_status != highspy.HighsModelStatus.kOptimal:',
+        '        print(f"Status: {model_status.name}")',
+        '        sys.exit(1)',
+        '',
         '    obj = h.getInfoValue("objective_function_value")[1]',
         '    sol = np.array(h.getSolution().col_value)',
         '',
@@ -924,8 +949,7 @@ def _solve_and_report(ir: IR) -> str:
         lines.append(f'    n_{sname.lower()} = len(data["{sname}"])')
     lines.append('')
 
-    lines.append('    status_str = "optimal" if status == 2 else str(int(status))')
-    lines.append('    print(f"Status: {status_str}")')
+    lines.append('    print("Status: optimal")')
     lines.append('    print(f"Objective: {obj:.4f}")')
     lines.append('    print("Solution:")')
 
