@@ -39,16 +39,16 @@ def litellm_retry(
     Raises:
         LLMError: On rate limit exhaustion or other API errors.
     """
+    last_exc: litellm.RateLimitError | None = None
     for attempt in range(max_retries):
         try:
             return fn()
         except litellm.RateLimitError as e:
+            last_exc = e
             if attempt < max_retries - 1:
                 time.sleep(backoff * (attempt + 1))
-            else:
-                raise LLMError(
-                    f"LLM rate limited after {max_retries} retries ({model}): {e}"
-                ) from e
         except Exception as e:
             raise LLMError(f"LLM API call failed ({model}): {e}") from e
-    raise AssertionError("unreachable")
+    raise LLMError(
+        f"LLM rate limited after {max_retries} retries ({model}): {last_exc}"
+    ) from last_exc
