@@ -3,21 +3,24 @@
 -include .env
 export
 
-all:
-	python3 -m venv .venv || true
-	.venv/bin/pip install -e '.[dev]'
+all: .venv
 
-test:
+.venv: pyproject.toml
+	python3 -m venv .venv
+	.venv/bin/pip install -e '.[dev]'
+	@touch .venv
+
+test: .venv
 	.venv/bin/pytest tests/ -x -q -m 'not llm'
 
-test-llm:
+test-llm: .venv
 	.venv/bin/pytest tests/ -x -q -m llm
 
-lint:
+lint: .venv
 	.venv/bin/ruff check src/ tests/
 
-fmt:
+fmt: .venv
 	.venv/bin/ruff format src/ tests/
 
-typecheck:
+typecheck: .venv
 	.venv/bin/mypy src/
