@@ -405,4 +405,5 @@ class TestReadmeExamples:
             assert result.exit_code == 0
             assert "Extracted model from" in result.output
             assert "Written:" in result.output
+            assert "Run:     md2mip compile" in result.output
             assert out_file.exists()

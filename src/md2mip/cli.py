@@ -160,6 +160,7 @@ def ocr(image_path: str, output: str | None, model: str):
         Path(output).write_text(result)
         click.echo(f"Extracted model from {image_path}", err=True)
         click.echo(f"Written: {output}")
+        click.echo(f"Run:     md2mip compile {output}")
     else:
         click.echo(result)
 

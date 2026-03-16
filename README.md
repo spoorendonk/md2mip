@@ -95,7 +95,7 @@ Solution:
 - `out/<name>_solver.py` — standalone solver script
 - `out/<name>_data.yaml` — complete data (if model has inline data) or template to fill in
 
-### 3. OCR full pipeline
+### 3. OCR — image to markdown
 
 Got a photo of a model? OCR extracts it:
 
@@ -110,11 +110,7 @@ Output:
 ```
 Extracted model from docs/knapsack_photo.png
 Written: model.md
-```
-
-```bash
-md2mip compile model.md
-python out/model_solver.py out/model_data.yaml
+Run:     md2mip compile model.md
 ```
 
 ## Install
