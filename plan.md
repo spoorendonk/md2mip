@@ -162,3 +162,171 @@ Small, isolated fixes. Low risk.
 
 ### Verify
 All tests pass
+
+## Phase 9: Simple Models + Confidence Report
+
+### 9a. Confidence report feature
+
+Add a warnings/confidence summary printed during `md2mip compile`. The IR already has a `warnings: list[str]` field that the LLM can populate. Surface it:
+
+- **`compiler.py`**: After `compile_to_ir()`, print any `ir.warnings` to stderr
+- **`cli.py`**: In `compile` command, after compilation print a summary:
+  - `"Parsed: {n} sets, {n} params, {n} vars, {n} constraints"`
+  - If `ir.warnings`: print each warning prefixed with `"WARNING: "`
+  - If no warnings: `"Confidence: high (no warnings)"`
+- **`prompt.py`**: Strengthen the warnings instruction — tell the LLM to flag:
+  - Ambiguous variable domains (continuous vs integer vs binary)
+  - Missing bounds or unclear constraints
+  - Contradictory text vs formulas
+  - Assumptions made about notation
+
+### 9b. New models (3 simple ones)
+
+**1. Capital Budgeting** (`capital_budgeting`)
+- 6 projects, 3 periods, select at most 3
+- Cardinality: `sum(y[p] for p in P) <= max_projects`
+- Implication: `y[3] <= y[1]` (project 3 requires project 1)
+- Mutual exclusion: `y[4] + y[5] <= 1`
+- Budget per period: `sum(cost[p,t] * y[p] for p in P) <= budget[t]`
+- Nasty variant: Written as a business memo with vague language ("we can't afford more than three initiatives", "the database migration depends on the cloud move")
+
+**2. Set Covering** (`set_covering`)
+- 10 regions, 7 candidate facilities, sparse 0/1 coverage matrix
+- Coverage: `sum(a[i,j] * y[j] for j in J) >= 1` for all i
+- Minimize: `sum(cost[j] * y[j] for j in J)`
+- Nasty variant: Presented as a table-only problem ("which fire stations cover which neighborhoods") with no math at all
+
+**3. Graph Coloring** (`graph_coloring`)
+- 6 vertices, 4 colors, ~8 edges
+- Binary: `x[v,k]` (vertex v gets color k)
+- Assignment: `sum(x[v,k] for k in K) == 1`
+- Conflict: `x[u,k] + x[v,k] <= 1` for edges (u,v)
+- Minimize colors: `sum(used[k] for k in K)` with `x[v,k] <= used[k]`
+- Nasty variant: Described as a radio frequency assignment problem ("adjacent towers can't use the same channel")
+
+### 9c. For each model
+- `models/<name>.md` — clean markdown with LaTeX math
+- `models/nasty_<name>.md` — ambiguous/sloppy variant
+- `data/<name>.yaml` — small instance, hand-verified optimal
+- `fixtures/<name>.ir.json` — hand-crafted expected IR
+- Image generation: add to `tests/generate_test_images.py` (both plain + rendered)
+- Tests: add to `test_ir.py`, `test_codegen.py`, `test_generated.py`, `test_llm_integration.py`
+
+### Files to modify
+- `src/md2mip/cli.py` — confidence report in compile command
+- `src/md2mip/prompt.py` — strengthen warnings instructions
+- `tests/generate_test_images.py` — add new models
+- `tests/test_ir.py` — add to parametrize
+- `tests/test_codegen.py` — add to parametrize
+- `tests/test_generated.py` — add test classes
+- `tests/test_llm_integration.py` — add to EXPECTED_OPTIMA + parametrize
+
+### Verify
+`make test && make lint && make typecheck`
+
+---
+
+## Phase 10: Multi-Period + Network Models
+
+### New models (3)
+
+**4. Unit Commitment** (`unit_commitment`)
+- 3 generators, 6 time periods
+- Vars: `p[g,t]` (power output), `u[g,t]` (on/off binary), `v[g,t]` (startup binary)
+- Ramp-up: `p[g,t] - p[g,t-1] <= ramp_up[g]`
+- Min/max output: `p_min[g] * u[g,t] <= p[g,t]`, `p[g,t] <= p_max[g] * u[g,t]`
+- Startup logic: `v[g,t] >= u[g,t] - u[g,t-1]`
+- Demand: `sum(p[g,t] for g in G) >= demand[t]`
+- **New constructs:** ramp-rate difference constraints, startup coupling, param*binary bounding continuous
+- Nasty variant: Power plant operator's notes with informal ramp descriptions ("Unit B can't increase more than 30MW per hour")
+
+**5. Multi-Commodity Flow** (`multicommodity_flow`)
+- 4 nodes, ~6 arcs, 2 commodities
+- Vars: `flow[i,j,k]` — 3-index
+- Flow conservation: `sum(flow[i,j,k] for j out) - sum(flow[j,i,k] for j in) == supply[i,k]`
+- Shared capacity: `sum(flow[i,j,k] for k in K) <= capacity[i,j]`
+- **New constructs:** 3-index variables, difference-of-sums, shared capacity
+- Nasty variant: Drawn as a network diagram description ("pipes carry oil and gas, each pipe has a max throughput")
+
+**6. Sudoku** (`sudoku`)
+- 4x4 mini-sudoku (sets 1..4), ~6 given clues
+- Vars: `x[i,j,k]` binary — 3-index
+- One per cell: `sum(x[i,j,k] for k in K) == 1`
+- Row/col/block uniqueness via == 1 constraints
+- Objective: `minimize 0` (pure feasibility)
+- **New constructs:** pure feasibility, 3-index binary, all-different
+- Nasty variant: Just a partially-filled grid image, minimal text ("solve this puzzle")
+
+### Codegen changes likely needed
+- 3D array loading in `_load_data` for 3-index params
+- `minimize 0` objective handling (constant objective)
+- Ramp constraints: existing lag machinery from lot_sizing should handle `t-1` patterns
+- `param * binary_var` products (e.g., `p_min[g] * u[g,t]`) in constraint expressions — may need `_parse_product` to handle param*var on constraint RHS
+
+### For each model
+Same deliverables as Phase 9: markdown, nasty variant, data, fixture, images, tests.
+
+### Verify
+`make test && make lint && make typecheck`
+
+---
+
+## Phase 11: Combinatorial + Scheduling Models
+
+### New models (3)
+
+**7. N-Queens** (`n_queens`)
+- N=6 board
+- Vars: `x[i,j]` binary (queen at row i, col j)
+- One per row/col: `sum(x[i,j] for j in J) == 1`
+- Diagonal conflicts: constraint pairs for same-diagonal cells
+- Objective: feasibility (maximize `sum(x[i,j])` or dummy)
+- **New constructs:** diagonal conflict constraints, data-driven pair exclusion
+- Nasty variant: Described as "place 6 non-attacking rooks on a chess board where diagonals also matter"
+
+**8. Job Shop Scheduling** (`job_shop`)
+- 3 jobs, 3 machines, known optimal makespan
+- Vars: `start[j,m]` continuous, `z[j1,j2,m]` binary ordering
+- Precedence: `start[j,m2] >= start[j,m1] + duration[j,m1]`
+- Disjunctive Big-M: `start[j1,m] + duration[j1,m] <= start[j2,m] + M*(1-z[j1,j2,m])`
+- Makespan: `C_max >= start[j,last_m] + duration[j,last_m]`
+- **New constructs:** Big-M disjunctive, makespan auxiliary variable, continuous scheduling vars
+- Nasty variant: Factory floor manager's description ("Job A needs welding then painting then assembly, Job B needs...")
+
+**9. TSP (MTZ)** (`tsp_mtz`)
+- 5 cities, distance matrix
+- Vars: `x[i,j]` binary (edge), `u[i]` continuous (visit order, 1..n)
+- Degree: `sum(x[i,j] for j in J) == 1` and `sum(x[j,i] for j in J) == 1`
+- MTZ: `u[i] - u[j] + n*x[i,j] <= n-1` for i,j >= 2
+- **New constructs:** order variables with bounds, MTZ coupling binary+continuous
+- Nasty variant: Delivery driver's problem ("visit these 5 addresses and return home, here are the drive times")
+
+### Codegen changes likely needed
+- Big-M expressions: `M*(1-z[i,j])` needs codegen to handle `1 - var` — the `_parse_product` / `_extract_linear_terms` would need to recognize this as `-M*z + M` (variable term + constant)
+- Makespan via auxiliary: `C_max >= expr` is a standard >= constraint, should work
+- MTZ constraint `u[i] - u[j] + n*x[i,j] <= n-1`: mixed continuous+binary terms — should work with existing term extraction
+
+### For each model
+Same deliverables as previous phases.
+
+### Verify
+`make test && make lint && make typecheck`
+Full LLM integration: `make test-llm`
+
+---
+
+## Image Generation Strategy
+
+For each new model, add to `tests/generate_test_images.py`:
+- `rendered_<name>.png` — proper math rendering via matplotlib
+- Also add to OCR LLM integration tests in `test_llm_integration.py`
+
+For nasty variants, consider generating "photo-style" images (noisy, rotated) to test OCR robustness.
+
+## Summary
+
+| Phase | Models | Key new constructs |
+|-------|--------|--------------------|
+| 9 | capital_budgeting, set_covering, graph_coloring + confidence report | Cardinality, implication, mutual exclusion, conflict pairs, color-usage linking |
+| 10 | unit_commitment, multicommodity_flow, sudoku | Ramp rates, 3-index vars, startup coupling, pure feasibility, all-different |
+| 11 | n_queens, job_shop, tsp_mtz | Diagonal conflicts, Big-M disjunctive, MTZ subtour elimination, makespan |

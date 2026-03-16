@@ -28,11 +28,23 @@ def compile(model_path: str, output: str | None, ir_only: bool, model: str):
     """Compile a markdown model to a standalone Python solver script."""
     markdown = Path(model_path).read_text()
 
-    if ir_only:
-        ir = compile_to_ir(markdown, model=model)
-        result = ir.to_json()
+    ir = compile_to_ir(markdown, model=model)
+    result = ir.to_json() if ir_only else compile_to_python(markdown, ir=ir)
+
+    # Confidence report
+    n_sets = len(ir.sets)
+    n_params = len(ir.parameters)
+    n_vars = len(ir.variables)
+    n_cons = len(ir.constraints)
+    click.echo(
+        f"Parsed: {n_sets} sets, {n_params} params, {n_vars} vars, {n_cons} constraints",
+        err=True,
+    )
+    if ir.warnings:
+        for w in ir.warnings:
+            click.echo(f"WARNING: {w}", err=True)
     else:
-        result = compile_to_python(markdown, model=model)
+        click.echo("Confidence: high (no warnings)", err=True)
 
     if output:
         out_path = Path(output)

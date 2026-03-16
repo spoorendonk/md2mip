@@ -104,6 +104,33 @@ class TestBlending:
 
 
 @pytest.mark.solver
+class TestCapitalBudgeting:
+    def test_solves_correctly(self):
+        rc, stdout, stderr = _run_generated("capital_budgeting")
+        assert rc == 0, f"Script failed:\n{stderr}"
+        obj = _extract_objective(stdout)
+        assert abs(obj - 115.0) < 0.01
+
+
+@pytest.mark.solver
+class TestSetCovering:
+    def test_solves_correctly(self):
+        rc, stdout, stderr = _run_generated("set_covering")
+        assert rc == 0, f"Script failed:\n{stderr}"
+        obj = _extract_objective(stdout)
+        assert abs(obj - 140.0) < 0.01
+
+
+@pytest.mark.solver
+class TestGraphColoring:
+    def test_solves_correctly(self):
+        rc, stdout, stderr = _run_generated("graph_coloring")
+        assert rc == 0, f"Script failed:\n{stderr}"
+        obj = _extract_objective(stdout)
+        assert abs(obj - 3.0) < 0.01
+
+
+@pytest.mark.solver
 class TestInfeasible:
     def test_infeasible_exit_code(self):
         rc, stdout, stderr = _run_generated("transportation", data_name="transportation_infeasible")

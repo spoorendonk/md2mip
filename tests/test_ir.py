@@ -126,6 +126,9 @@ class TestAllFixturesValid:
             "lot_sizing",
             "assignment",
             "blending",
+            "capital_budgeting",
+            "set_covering",
+            "graph_coloring",
         ],
     )
     def test_fixture_validates(self, name):

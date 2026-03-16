@@ -258,6 +258,9 @@ def main():
 
     knapsack_md = (MODELS_DIR / "knapsack.md").read_text()
     transport_md = (MODELS_DIR / "transportation.md").read_text()
+    capital_budgeting_md = (MODELS_DIR / "capital_budgeting.md").read_text()
+    set_covering_md = (MODELS_DIR / "set_covering.md").read_text()
+    graph_coloring_md = (MODELS_DIR / "graph_coloring.md").read_text()
 
     # Plain text images (raw markdown as monospace)
     render_text_to_image(knapsack_md, IMAGES_DIR / "clean_knapsack.png")
@@ -272,6 +275,9 @@ def main():
     # Rendered math images (proper notation via matplotlib)
     render_markdown_to_image(knapsack_md, IMAGES_DIR / "rendered_knapsack.png")
     render_markdown_to_image(transport_md, IMAGES_DIR / "rendered_transport.png")
+    render_markdown_to_image(capital_budgeting_md, IMAGES_DIR / "rendered_capital_budgeting.png")
+    render_markdown_to_image(set_covering_md, IMAGES_DIR / "rendered_set_covering.png")
+    render_markdown_to_image(graph_coloring_md, IMAGES_DIR / "rendered_graph_coloring.png")
 
     print("Done.")
 

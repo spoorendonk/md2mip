@@ -1,0 +1,45 @@
+{
+  "name": "capital_budgeting",
+  "sets": {
+    "P": { "description": "projects" },
+    "T": { "description": "budget periods" }
+  },
+  "parameters": {
+    "npv": { "indices": ["P"], "description": "net present value of each project" },
+    "cost": { "indices": ["P", "T"], "description": "cost of project p in period t" },
+    "B": { "indices": ["T"], "description": "budget for each period" },
+    "K": { "indices": [], "description": "maximum number of projects", "default": 3 }
+  },
+  "variables": {
+    "y": {
+      "indices": ["P"],
+      "type": "binary",
+      "lower_bound": 0,
+      "upper_bound": 1,
+      "description": "1 if project p is selected"
+    }
+  },
+  "objective": {
+    "sense": "maximize",
+    "expression": "sum(npv[p] * y[p] for p in P)"
+  },
+  "constraints": {
+    "cardinality": {
+      "for_all": [],
+      "expression": "sum(y[p] for p in P) <= K"
+    },
+    "budget": {
+      "for_all": ["t in T"],
+      "expression": "sum(cost[p,t] * y[p] for p in P) <= B[t]"
+    },
+    "implication": {
+      "for_all": [],
+      "expression": "y[2] <= y[0]"
+    },
+    "mutual_exclusion": {
+      "for_all": [],
+      "expression": "y[3] + y[4] <= 1"
+    }
+  },
+  "warnings": []
+}

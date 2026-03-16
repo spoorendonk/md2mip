@@ -30,12 +30,18 @@ EXPECTED_OPTIMA = {
     "facility_location": 185.0,
     "assignment": 13.0,
     "blending": 33.33,
+    "capital_budgeting": 115.0,
+    "set_covering": 140.0,
+    "graph_coloring": 3.0,
     "nasty_knapsack": 15.0,
     "nasty_transport": 215.0,
     "nasty_assignment": 13.0,
     "nasty_diet": 33.33,
     "nasty_misleading": 170.0,
     "nasty_trivial": 10.0,
+    "nasty_capital_budgeting": 115.0,
+    "nasty_set_covering": 140.0,
+    "nasty_graph_coloring": 3.0,
 }
 
 # Lot sizing doesn't have a single known optimum, just a feasibility bound
@@ -47,6 +53,9 @@ DATA_FILE_MAP = {
     "nasty_transport": "transportation",
     "nasty_assignment": "assignment",
     "nasty_diet": "blending",
+    "nasty_capital_budgeting": "capital_budgeting",
+    "nasty_set_covering": "set_covering",
+    "nasty_graph_coloring": "graph_coloring",
 }
 
 ALL_STANDARD_MODELS = [
@@ -56,6 +65,9 @@ ALL_STANDARD_MODELS = [
     "lot_sizing",
     "assignment",
     "blending",
+    "capital_budgeting",
+    "set_covering",
+    "graph_coloring",
 ]
 
 NASTY_MODELS = [
@@ -65,6 +77,9 @@ NASTY_MODELS = [
     "nasty_diet",
     "nasty_misleading",
     "nasty_trivial",
+    "nasty_capital_budgeting",
+    "nasty_set_covering",
+    "nasty_graph_coloring",
 ]
 
 
@@ -132,6 +147,9 @@ class TestLLMEndToEnd:
             "facility_location",
             "assignment",
             "blending",
+            "capital_budgeting",
+            "set_covering",
+            "graph_coloring",
         ]
         + NASTY_MODELS,
     )

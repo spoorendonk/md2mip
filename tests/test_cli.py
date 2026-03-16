@@ -94,6 +94,34 @@ class TestCompileCommand:
             mock.assert_called_once()
             assert mock.call_args[1]["model"] == "ollama/qwen3"
 
+    def test_compile_confidence_report_no_warnings(self, tmp_path):
+        """Confidence report shows parsed counts and 'high' when no warnings."""
+        fixture = load_fixture("transportation")
+        model_file = tmp_path / "model.md"
+        model_file.write_text("# Test model")
+
+        with patch("md2mip.compiler.parse_model", return_value=fixture):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["compile", str(model_file), "--ir-only"])
+            assert result.exit_code == 0
+            assert "Parsed: 2 sets, 3 params, 1 vars, 2 constraints" in result.output
+            assert "Confidence: high (no warnings)" in result.output
+
+    def test_compile_confidence_report_with_warnings(self, tmp_path):
+        """Confidence report surfaces LLM warnings."""
+        fixture = load_fixture("transportation")
+        fixture["warnings"] = ["Assumed non-negativity for x", "Ambiguous indexing"]
+        model_file = tmp_path / "model.md"
+        model_file.write_text("# Test model")
+
+        with patch("md2mip.compiler.parse_model", return_value=fixture):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["compile", str(model_file), "--ir-only"])
+            assert result.exit_code == 0
+            assert "WARNING: Assumed non-negativity for x" in result.output
+            assert "WARNING: Ambiguous indexing" in result.output
+            assert "Confidence: high" not in result.output
+
     def test_compile_llm_error(self, tmp_path):
         """Test graceful error when LLM fails."""
         from md2mip.llm import LLMError

@@ -38,7 +38,7 @@ Return ONLY valid JSON (no markdown fences, no explanation) with this schema:
       "expression": "sum(x[i,j] for j in J) <= s[i]"
     }
   },
-  "warnings": ["any ambiguities or assumptions you made"]
+  "warnings": ["list of ambiguities, assumptions, or potential issues"]
 }
 ```
 
@@ -137,6 +137,14 @@ Output:
   "warnings": []
 }
 ```
+
+### Warnings
+Populate the `warnings` list when you encounter any of the following:
+- **Ambiguous variable domains**: e.g., a variable could be continuous, integer, or binary and the text is unclear.
+- **Missing bounds or unclear constraints**: e.g., no explicit non-negativity, or a constraint could be interpreted multiple ways.
+- **Contradictory text vs formulas**: e.g., the text says "maximize" but the formula uses "min".
+- **Assumptions about notation**: e.g., you had to guess what a subscript means, or the indexing convention was unclear.
+If the model is clear and unambiguous, leave warnings as an empty list.
 
 Now parse the following markdown model:
 """

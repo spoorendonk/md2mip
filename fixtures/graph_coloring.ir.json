@@ -1,0 +1,45 @@
+{
+  "name": "graph_coloring",
+  "sets": {
+    "V": { "description": "vertices" },
+    "K": { "description": "available colors" }
+  },
+  "parameters": {
+    "adj": { "indices": ["V", "V"], "description": "adjacency matrix, 1 if edge exists" }
+  },
+  "variables": {
+    "x": {
+      "indices": ["V", "K"],
+      "type": "binary",
+      "lower_bound": 0,
+      "upper_bound": 1,
+      "description": "1 if vertex v is assigned color k"
+    },
+    "used": {
+      "indices": ["K"],
+      "type": "binary",
+      "lower_bound": 0,
+      "upper_bound": 1,
+      "description": "1 if color k is used"
+    }
+  },
+  "objective": {
+    "sense": "minimize",
+    "expression": "sum(used[k] for k in K)"
+  },
+  "constraints": {
+    "assignment": {
+      "for_all": ["v in V"],
+      "expression": "sum(x[v,k] for k in K) == 1"
+    },
+    "conflict": {
+      "for_all": ["v1 in V", "v2 in V", "k in K"],
+      "expression": "adj[v1,v2] * x[v1,k] + adj[v1,v2] * x[v2,k] <= 1"
+    },
+    "color_usage": {
+      "for_all": ["v in V", "k in K"],
+      "expression": "x[v,k] <= used[k]"
+    }
+  },
+  "warnings": []
+}

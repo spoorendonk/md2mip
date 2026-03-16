@@ -1,0 +1,31 @@
+{
+  "name": "set_covering",
+  "sets": {
+    "I": { "description": "regions to cover" },
+    "J": { "description": "candidate facility locations" }
+  },
+  "parameters": {
+    "c": { "indices": ["J"], "description": "cost of opening facility j" },
+    "a": { "indices": ["I", "J"], "description": "1 if facility j covers region i" }
+  },
+  "variables": {
+    "y": {
+      "indices": ["J"],
+      "type": "binary",
+      "lower_bound": 0,
+      "upper_bound": 1,
+      "description": "1 if facility j is opened"
+    }
+  },
+  "objective": {
+    "sense": "minimize",
+    "expression": "sum(c[j] * y[j] for j in J)"
+  },
+  "constraints": {
+    "coverage": {
+      "for_all": ["i in I"],
+      "expression": "sum(a[i,j] * y[j] for j in J) >= 1"
+    }
+  },
+  "warnings": []
+}
