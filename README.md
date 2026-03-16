@@ -56,12 +56,36 @@ Solution:
 ```bash
 # Compile — generates solver script AND data template
 md2mip compile models/transportation.md
+```
 
+Output:
+
+```
+Parsed: 2 sets, 3 params, 1 vars, 2 constraints
+Confidence: high (no warnings)
+Written: out/transportation_solver.py
+Written: out/transportation_data.yaml
+Run:     python out/transportation_solver.py out/transportation_data.yaml
+```
+
+```bash
 # Run with the generated default data
 python out/transportation_solver.py out/transportation_data.yaml
 
 # Run with a larger instance
 python out/transportation_solver.py data/transportation_large.yaml
+```
+
+Output:
+
+```
+Status: optimal
+Objective: 215.0000
+Solution:
+  x[factory1,warehouse1] = 20.0000
+  x[factory1,warehouse3] = 10.0000
+  x[factory2,warehouse2] = 25.0000
+  x[factory2,warehouse3] = 25.0000
 ```
 
 `compile` always writes two files:
@@ -75,7 +99,17 @@ Got a photo of a model? OCR extracts it:
 ![Knapsack model photo](docs/knapsack_photo.png)
 
 ```bash
-md2mip ocr photo.png -o model.md
+md2mip ocr docs/knapsack_photo.png -o model.md
+```
+
+Output:
+
+```
+Extracted model from docs/knapsack_photo.png
+Written: model.md
+```
+
+```bash
 md2mip compile model.md
 python out/model_solver.py out/model_data.yaml
 ```

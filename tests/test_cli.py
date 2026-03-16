@@ -327,3 +327,82 @@ class TestRunCommand:
         runner = CliRunner()
         result = runner.invoke(cli, ["run", "nonexistent.md"])
         assert result.exit_code != 0
+
+
+class TestReadmeExamples:
+    """Tests that verify the README examples produce the documented output."""
+
+    @pytest.mark.solver
+    def test_readme_example1_knapsack_run(self, tmp_path, capfd):
+        """README example 1: run knapsack with inline data."""
+        fixture = load_fixture("knapsack")
+        fixture["data"] = {
+            "I": ["item1", "item2", "item3", "item4", "item5"],
+            "v": [4, 2, 10, 1, 2],
+            "w": [12, 1, 4, 1, 2],
+            "W": 15,
+        }
+        model_file = tmp_path / "knapsack.md"
+        model_file.write_text("# Knapsack")
+
+        with patch("md2mip.compiler.parse_model", return_value=fixture):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["run", str(model_file)])
+            assert result.exit_code == 0, f"Output: {result.output}"
+
+        captured = capfd.readouterr()
+        assert "Objective: 15.0" in captured.out
+        assert "x[item2] = 1.0" in captured.out
+
+    def test_readme_example2_compile_output(self, tmp_path):
+        """README example 2: compile transportation shows Written + Run lines."""
+        fixture = load_fixture("transportation")
+        model_file = tmp_path / "transportation.md"
+        model_file.write_text("# Transportation")
+        out_dir = tmp_path / "out"
+
+        with (
+            patch("md2mip.compiler.parse_model", return_value=fixture),
+            patch("md2mip.cli.OUT_DIR", out_dir),
+        ):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["compile", str(model_file)])
+
+        assert result.exit_code == 0
+        assert "Written:" in result.output
+        assert "transportation_solver.py" in result.output
+        assert "transportation_data.yaml" in result.output
+        assert (out_dir / "transportation_solver.py").exists()
+        assert (out_dir / "transportation_data.yaml").exists()
+
+    @pytest.mark.solver
+    def test_readme_example2_run_with_data(self, tmp_path, capfd):
+        """README example 2: run transportation with data file."""
+        from tests.conftest import DATA_DIR
+
+        fixture = load_fixture("transportation")
+        model_file = tmp_path / "transportation.md"
+        model_file.write_text("# Transportation")
+        data_path = DATA_DIR / "transportation.yaml"
+
+        with patch("md2mip.compiler.parse_model", return_value=fixture):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["run", str(model_file), "--data", str(data_path)])
+            assert result.exit_code == 0, f"Output: {result.output}"
+
+        captured = capfd.readouterr()
+        assert "Objective: 215.0" in captured.out
+
+    def test_readme_example3_ocr_output(self, tmp_path):
+        """README example 3: OCR writes file and shows extraction message."""
+        img_file = tmp_path / "knapsack_photo.png"
+        img_file.write_bytes(b"\x89PNG" + b"\x00" * 100)
+        out_file = tmp_path / "model.md"
+
+        with patch("md2mip.cli.ocr_image", return_value="# Extracted Model"):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["ocr", str(img_file), "-o", str(out_file)])
+            assert result.exit_code == 0
+            assert "Extracted model from" in result.output
+            assert "Written:" in result.output
+            assert out_file.exists()
