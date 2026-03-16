@@ -22,6 +22,7 @@ big_M: 20
 
 # pair_ub[j1,j2]: 3x3 = 9 entries
 # 0 for j1!=j2, big_M for j1==j2 (deactivates self-pair constraints)
+# Values on diagonal must equal big_M above
 pair_ub:
   # j1=0
   - 20

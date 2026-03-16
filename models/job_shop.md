@@ -27,7 +27,7 @@ $$\min\; \text{makespan}$$
 
 ## Constraints
 
-**Precedence (first machine):**
+**Precedence (first machine)** (trivially satisfied by variable bounds; anchors the lag pattern):
 $$\text{start}_{j,0} \geq 0 \quad \forall j \in J$$
 
 **Precedence (subsequent machines):**
