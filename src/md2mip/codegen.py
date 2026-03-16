@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import functools
 import re
 from typing import Literal
 
@@ -812,12 +813,17 @@ def _split_additive_terms(expr: str) -> list[tuple[str, str]]:
     return [(s, t) for s, t in terms if t]
 
 
+@functools.lru_cache(maxsize=8)
+def _var_reference_re(var_names: tuple[str, ...]) -> re.Pattern[str]:
+    """Compile and cache a regex that matches any of the given variable names."""
+    return re.compile(r"\b(?:" + "|".join(re.escape(v) for v in var_names) + r")\b")
+
+
 def _has_var_reference(term: str, ir: IR) -> bool:
     """Check if term references any variable."""
     if not ir.variables:
         return False
-    pattern = r"\b(?:" + "|".join(re.escape(v) for v in ir.variables) + r")\b"
-    return bool(re.search(pattern, term))
+    return bool(_var_reference_re(tuple(ir.variables)).search(term))
 
 
 def _parse_product_with_lag(body: str, ir: IR) -> tuple[str, str, list[str]]:
