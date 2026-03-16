@@ -1,0 +1,49 @@
+{
+  "name": "sudoku",
+  "sets": {
+    "R": { "description": "rows" },
+    "C": { "description": "columns" },
+    "V": { "description": "values" },
+    "B": { "description": "blocks" }
+  },
+  "parameters": {
+    "blk": { "indices": ["R", "C", "B"], "description": "cell-to-block membership" },
+    "clue": { "indices": ["R", "C", "V"], "description": "given digit clues" }
+  },
+  "variables": {
+    "x": {
+      "indices": ["R", "C", "V"],
+      "type": "binary",
+      "lower_bound": 0,
+      "upper_bound": 1,
+      "description": "1 if cell (r,c) has value v"
+    }
+  },
+  "objective": {
+    "sense": "minimize",
+    "expression": "0"
+  },
+  "constraints": {
+    "one_per_cell": {
+      "for_all": ["r in R", "c in C"],
+      "expression": "sum(x[r,c,v] for v in V) == 1"
+    },
+    "row_unique": {
+      "for_all": ["r in R", "v in V"],
+      "expression": "sum(x[r,c,v] for c in C) == 1"
+    },
+    "col_unique": {
+      "for_all": ["c in C", "v in V"],
+      "expression": "sum(x[r,c,v] for r in R) == 1"
+    },
+    "block_unique": {
+      "for_all": ["b in B", "v in V"],
+      "expression": "sum(blk[r,c,b] * x[r,c,v] for r in R for c in C) == 1"
+    },
+    "clue_fix": {
+      "for_all": ["r in R", "c in C", "v in V"],
+      "expression": "x[r,c,v] >= clue[r,c,v]"
+    }
+  },
+  "warnings": []
+}

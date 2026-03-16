@@ -24,6 +24,9 @@ class TestCodegenSyntax:
             "capital_budgeting",
             "set_covering",
             "graph_coloring",
+            "sudoku",
+            "multicommodity_flow",
+            "unit_commitment",
         ],
     )
     def test_generates_valid_python(self, name):
@@ -45,6 +48,9 @@ class TestCodegenSyntax:
             "capital_budgeting",
             "set_covering",
             "graph_coloring",
+            "sudoku",
+            "multicommodity_flow",
+            "unit_commitment",
         ],
     )
     def test_has_required_functions(self, name):
@@ -68,6 +74,9 @@ class TestCodegenSyntax:
             "capital_budgeting",
             "set_covering",
             "graph_coloring",
+            "sudoku",
+            "multicommodity_flow",
+            "unit_commitment",
         ],
     )
     def test_has_constraint_functions(self, name):

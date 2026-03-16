@@ -1,0 +1,36 @@
+{
+  "name": "multicommodity_flow",
+  "sets": {
+    "N": { "description": "nodes" },
+    "K": { "description": "commodities" }
+  },
+  "parameters": {
+    "cap": { "indices": ["N", "N"], "description": "arc capacity" },
+    "cost": { "indices": ["N", "N", "K"], "description": "per-unit flow cost" },
+    "supply": { "indices": ["N", "K"], "description": "net supply (positive=supply, negative=demand)" }
+  },
+  "variables": {
+    "flow": {
+      "indices": ["N", "N", "K"],
+      "type": "continuous",
+      "lower_bound": 0,
+      "upper_bound": null,
+      "description": "flow of commodity k on arc (i,j)"
+    }
+  },
+  "objective": {
+    "sense": "minimize",
+    "expression": "sum(cost[i,j,k] * flow[i,j,k] for i in N for j in N for k in K)"
+  },
+  "constraints": {
+    "flow_balance": {
+      "for_all": ["i in N", "k in K"],
+      "expression": "sum(flow[i,j,k] for j in N) - sum(flow[j,i,k] for j in N) == supply[i,k]"
+    },
+    "capacity": {
+      "for_all": ["i in N", "j in N"],
+      "expression": "sum(flow[i,j,k] for k in K) <= cap[i,j]"
+    }
+  },
+  "warnings": []
+}

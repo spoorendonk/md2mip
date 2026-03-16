@@ -131,6 +131,33 @@ class TestGraphColoring:
 
 
 @pytest.mark.solver
+class TestSudoku:
+    def test_solves_correctly(self):
+        rc, stdout, stderr = _run_generated("sudoku")
+        assert rc == 0, f"Script failed:\n{stderr}"
+        obj = _extract_objective(stdout)
+        assert abs(obj - 0.0) < 0.01
+
+
+@pytest.mark.solver
+class TestMulticommodityFlow:
+    def test_solves_correctly(self):
+        rc, stdout, stderr = _run_generated("multicommodity_flow")
+        assert rc == 0, f"Script failed:\n{stderr}"
+        obj = _extract_objective(stdout)
+        assert abs(obj - 14.0) < 0.01
+
+
+@pytest.mark.solver
+class TestUnitCommitment:
+    def test_solves_correctly(self):
+        rc, stdout, stderr = _run_generated("unit_commitment")
+        assert rc == 0, f"Script failed:\n{stderr}"
+        obj = _extract_objective(stdout)
+        assert abs(obj - 300.0) < 0.01
+
+
+@pytest.mark.solver
 class TestInfeasible:
     def test_infeasible_exit_code(self):
         rc, stdout, stderr = _run_generated("transportation", data_name="transportation_infeasible")

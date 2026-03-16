@@ -129,6 +129,9 @@ class TestAllFixturesValid:
             "capital_budgeting",
             "set_covering",
             "graph_coloring",
+            "sudoku",
+            "multicommodity_flow",
+            "unit_commitment",
         ],
     )
     def test_fixture_validates(self, name):

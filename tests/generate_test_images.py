@@ -261,6 +261,9 @@ def main():
     capital_budgeting_md = (MODELS_DIR / "capital_budgeting.md").read_text()
     set_covering_md = (MODELS_DIR / "set_covering.md").read_text()
     graph_coloring_md = (MODELS_DIR / "graph_coloring.md").read_text()
+    sudoku_md = (MODELS_DIR / "sudoku.md").read_text()
+    multicommodity_flow_md = (MODELS_DIR / "multicommodity_flow.md").read_text()
+    unit_commitment_md = (MODELS_DIR / "unit_commitment.md").read_text()
 
     # Plain text images (raw markdown as monospace)
     render_text_to_image(knapsack_md, IMAGES_DIR / "clean_knapsack.png")
@@ -278,6 +281,11 @@ def main():
     render_markdown_to_image(capital_budgeting_md, IMAGES_DIR / "rendered_capital_budgeting.png")
     render_markdown_to_image(set_covering_md, IMAGES_DIR / "rendered_set_covering.png")
     render_markdown_to_image(graph_coloring_md, IMAGES_DIR / "rendered_graph_coloring.png")
+    render_markdown_to_image(sudoku_md, IMAGES_DIR / "rendered_sudoku.png")
+    render_markdown_to_image(
+        multicommodity_flow_md, IMAGES_DIR / "rendered_multicommodity_flow.png"
+    )
+    render_markdown_to_image(unit_commitment_md, IMAGES_DIR / "rendered_unit_commitment.png")
 
     print("Done.")
 

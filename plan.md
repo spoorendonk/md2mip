@@ -163,111 +163,33 @@ Small, isolated fixes. Low risk.
 ### Verify
 All tests pass
 
-## Phase 9: Simple Models + Confidence Report
+## Phase 9: Simple Models + Confidence Report ✅
 
-### 9a. Confidence report feature
+Committed as `6c36835`. 96 offline tests pass.
 
-Add a warnings/confidence summary printed during `md2mip compile`. The IR already has a `warnings: list[str]` field that the LLM can populate. Surface it:
-
-- **`compiler.py`**: After `compile_to_ir()`, print any `ir.warnings` to stderr
-- **`cli.py`**: In `compile` command, after compilation print a summary:
-  - `"Parsed: {n} sets, {n} params, {n} vars, {n} constraints"`
-  - If `ir.warnings`: print each warning prefixed with `"WARNING: "`
-  - If no warnings: `"Confidence: high (no warnings)"`
-- **`prompt.py`**: Strengthen the warnings instruction — tell the LLM to flag:
-  - Ambiguous variable domains (continuous vs integer vs binary)
-  - Missing bounds or unclear constraints
-  - Contradictory text vs formulas
-  - Assumptions made about notation
-
-### 9b. New models (3 simple ones)
-
-**1. Capital Budgeting** (`capital_budgeting`)
-- 6 projects, 3 periods, select at most 3
-- Cardinality: `sum(y[p] for p in P) <= max_projects`
-- Implication: `y[3] <= y[1]` (project 3 requires project 1)
-- Mutual exclusion: `y[4] + y[5] <= 1`
-- Budget per period: `sum(cost[p,t] * y[p] for p in P) <= budget[t]`
-- Nasty variant: Written as a business memo with vague language ("we can't afford more than three initiatives", "the database migration depends on the cloud move")
-
-**2. Set Covering** (`set_covering`)
-- 10 regions, 7 candidate facilities, sparse 0/1 coverage matrix
-- Coverage: `sum(a[i,j] * y[j] for j in J) >= 1` for all i
-- Minimize: `sum(cost[j] * y[j] for j in J)`
-- Nasty variant: Presented as a table-only problem ("which fire stations cover which neighborhoods") with no math at all
-
-**3. Graph Coloring** (`graph_coloring`)
-- 6 vertices, 4 colors, ~8 edges
-- Binary: `x[v,k]` (vertex v gets color k)
-- Assignment: `sum(x[v,k] for k in K) == 1`
-- Conflict: `x[u,k] + x[v,k] <= 1` for edges (u,v)
-- Minimize colors: `sum(used[k] for k in K)` with `x[v,k] <= used[k]`
-- Nasty variant: Described as a radio frequency assignment problem ("adjacent towers can't use the same channel")
-
-### 9c. For each model
-- `models/<name>.md` — clean markdown with LaTeX math
-- `models/nasty_<name>.md` — ambiguous/sloppy variant
-- `data/<name>.yaml` — small instance, hand-verified optimal
-- `fixtures/<name>.ir.json` — hand-crafted expected IR
-- Image generation: add to `tests/generate_test_images.py` (both plain + rendered)
-- Tests: add to `test_ir.py`, `test_codegen.py`, `test_generated.py`, `test_llm_integration.py`
-
-### Files to modify
-- `src/md2mip/cli.py` — confidence report in compile command
-- `src/md2mip/prompt.py` — strengthen warnings instructions
-- `tests/generate_test_images.py` — add new models
-- `tests/test_ir.py` — add to parametrize
-- `tests/test_codegen.py` — add to parametrize
-- `tests/test_generated.py` — add test classes
-- `tests/test_llm_integration.py` — add to EXPECTED_OPTIMA + parametrize
-
-### Verify
-`make test && make lint && make typecheck`
+- Confidence report: `compile` prints parsed counts + warnings to stderr
+- Prompt: strengthened warnings instructions (ambiguous domains, missing bounds, contradictions, notation assumptions)
+- `compile_to_python()` accepts optional pre-compiled `ir` to avoid double LLM calls
+- 3 new models: capital_budgeting (opt=115), set_covering (opt=140), graph_coloring (opt=3)
+- Each with clean markdown, nasty variant, data, fixture, image generation, full test coverage
+- Key constructs: cardinality, implication, mutual exclusion, adjacency-weighted conflict, color-usage linking
 
 ---
 
-## Phase 10: Multi-Period + Network Models
+## Phase 10: Multi-Period + Network Models ✅
 
-### New models (3)
+PR #5. 111 offline tests pass.
 
-**4. Unit Commitment** (`unit_commitment`)
-- 3 generators, 6 time periods
-- Vars: `p[g,t]` (power output), `u[g,t]` (on/off binary), `v[g,t]` (startup binary)
-- Ramp-up: `p[g,t] - p[g,t-1] <= ramp_up[g]`
-- Min/max output: `p_min[g] * u[g,t] <= p[g,t]`, `p[g,t] <= p_max[g] * u[g,t]`
-- Startup logic: `v[g,t] >= u[g,t] - u[g,t-1]`
-- Demand: `sum(p[g,t] for g in G) >= demand[t]`
-- **New constructs:** ramp-rate difference constraints, startup coupling, param*binary bounding continuous
-- Nasty variant: Power plant operator's notes with informal ramp descriptions ("Unit B can't increase more than 30MW per hour")
-
-**5. Multi-Commodity Flow** (`multicommodity_flow`)
-- 4 nodes, ~6 arcs, 2 commodities
-- Vars: `flow[i,j,k]` — 3-index
-- Flow conservation: `sum(flow[i,j,k] for j out) - sum(flow[j,i,k] for j in) == supply[i,k]`
-- Shared capacity: `sum(flow[i,j,k] for k in K) <= capacity[i,j]`
-- **New constructs:** 3-index variables, difference-of-sums, shared capacity
-- Nasty variant: Drawn as a network diagram description ("pipes carry oil and gas, each pipe has a max throughput")
-
-**6. Sudoku** (`sudoku`)
-- 4x4 mini-sudoku (sets 1..4), ~6 given clues
-- Vars: `x[i,j,k]` binary — 3-index
-- One per cell: `sum(x[i,j,k] for k in K) == 1`
-- Row/col/block uniqueness via == 1 constraints
-- Objective: `minimize 0` (pure feasibility)
-- **New constructs:** pure feasibility, 3-index binary, all-different
-- Nasty variant: Just a partially-filled grid image, minimal text ("solve this puzzle")
-
-### Codegen changes likely needed
-- 3D array loading in `_load_data` for 3-index params
-- `minimize 0` objective handling (constant objective)
-- Ramp constraints: existing lag machinery from lot_sizing should handle `t-1` patterns
-- `param * binary_var` products (e.g., `p_min[g] * u[g,t]`) in constraint expressions — may need `_parse_product` to handle param*var on constraint RHS
-
-### For each model
-Same deliverables as Phase 9: markdown, nasty variant, data, fixture, images, tests.
-
-### Verify
-`make test && make lint && make typecheck`
+- 3 new models: sudoku (opt=0, feasibility), multicommodity_flow (opt=14), unit_commitment (opt=300)
+- Each with clean markdown, nasty variant, data, fixture, full test coverage
+- Key constructs: 3-index binary/continuous vars, pure feasibility, difference-of-sums, multi-index lags, param×binary products, startup coupling
+- Codegen fixes:
+  - Constant/zero objectives (`minimize 0`) — early return instead of TODO fallthrough
+  - `LinearTerm.lag_index` tracking — lag adjustments target correct iterator, not always first
+  - `start_idx=1` applied per-iterator based on lag_index, not globally
+  - Multi-index parameter reshape (1D→ND) in `_load_data`
+  - `_merge_row` helper deduplicates column indices (needed for sum−sum with self-loops)
+  - Robust lag detection regex `\[[^\]]*\w+\s*-\s*\d+` replaces literal `"t-1"` check
 
 ---
 
@@ -328,5 +250,5 @@ For nasty variants, consider generating "photo-style" images (noisy, rotated) to
 | Phase | Models | Key new constructs |
 |-------|--------|--------------------|
 | 9 | capital_budgeting, set_covering, graph_coloring + confidence report | Cardinality, implication, mutual exclusion, conflict pairs, color-usage linking |
-| 10 | unit_commitment, multicommodity_flow, sudoku | Ramp rates, 3-index vars, startup coupling, pure feasibility, all-different |
+| 10 ✅ | sudoku, multicommodity_flow, unit_commitment | 3-index vars, pure feasibility, sum−sum, multi-index lags, param×binary, startup coupling |
 | 11 | n_queens, job_shop, tsp_mtz | Diagonal conflicts, Big-M disjunctive, MTZ subtour elimination, makespan |
