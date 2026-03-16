@@ -178,7 +178,7 @@ Committed as `6c36835`. 96 offline tests pass.
 
 ## Phase 10: Multi-Period + Network Models ✅
 
-PR #5. 111 offline tests pass.
+Committed as `e7aa728`. 111 offline tests pass.
 
 - 3 new models: sudoku (opt=0, feasibility), multicommodity_flow (opt=14), unit_commitment (opt=300)
 - Each with clean markdown, nasty variant, data, fixture, full test coverage
@@ -249,6 +249,6 @@ For nasty variants, consider generating "photo-style" images (noisy, rotated) to
 
 | Phase | Models | Key new constructs |
 |-------|--------|--------------------|
-| 9 | capital_budgeting, set_covering, graph_coloring + confidence report | Cardinality, implication, mutual exclusion, conflict pairs, color-usage linking |
+| 9 ✅ | capital_budgeting, set_covering, graph_coloring + confidence report | Cardinality, implication, mutual exclusion, conflict pairs, color-usage linking |
 | 10 ✅ | sudoku, multicommodity_flow, unit_commitment | 3-index vars, pure feasibility, sum−sum, multi-index lags, param×binary, startup coupling |
 | 11 | n_queens, job_shop, tsp_mtz | Diagonal conflicts, Big-M disjunctive, MTZ subtour elimination, makespan |
