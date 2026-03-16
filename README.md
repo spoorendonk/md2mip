@@ -10,13 +10,26 @@ markdown → (LLM) → IR → codegen → Python + HiGHS
 
 ### 1. Quick run — data in markdown (knapsack)
 
-`models/knapsack.md` contains inline data (values, weights, capacity). One command:
+`models/knapsack.md`:
+
+> **0-1 Knapsack**
+>
+> We have 5 items. Knapsack capacity W=15.
+>
+> Values: v = (4, 2, 10, 1, 2)
+>
+> Weights: w = (12, 1, 4, 1, 2)
+>
+> Pick items to maximize value:
+> max &sum; v_i x_i &ensp; s.t. &sum; w_i x_i &le; W, &ensp; x_i &in; {0, 1}
+
+One command — the LLM extracts the data automatically:
 
 ```bash
 md2mip run models/knapsack.md
 ```
 
-The LLM extracts the data automatically. Output:
+Output:
 
 ```
 Status: optimal
@@ -30,6 +43,15 @@ Solution:
 ```
 
 ### 2. Compile + run with different data (transportation)
+
+`models/transportation.md`:
+
+> **Transportation Problem**
+>
+> Sources I={1,2}, destinations J={1,2,3}.
+> Cost matrix c, supply s=(30, 50), demand d=(20, 25, 35).
+>
+> min &sum; c_ij x_ij &ensp; s.t. &sum;_j x_ij &le; s_i, &ensp; &sum;_i x_ij &ge; d_j
 
 ```bash
 # Compile — generates solver script AND data template
@@ -47,6 +69,10 @@ python out/transportation_solver.py data/transportation_large.yaml
 - `out/<name>_data.yaml` — complete data (if model has inline data) or template to fill in
 
 ### 3. OCR full pipeline
+
+Got a photo of a model? OCR extracts it:
+
+![Knapsack model photo](docs/knapsack_photo.png)
 
 ```bash
 md2mip ocr photo.png -o model.md
