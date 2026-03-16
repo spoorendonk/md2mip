@@ -2,6 +2,7 @@
 
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 
 from md2mip.cli import cli
@@ -46,7 +47,7 @@ class TestCompileCommand:
         out_file = out_dir / "mymodel_solver.py"
         assert out_file.exists()
         assert "import highspy" in out_file.read_text()
-        assert "Written to" in result.output
+        assert "Written:" in result.output
         assert "Run:" in result.output
 
     def test_compile_to_file(self, tmp_path):
@@ -241,7 +242,87 @@ class TestValidateCommand:
             assert "FAIL" in result.output
 
 
+class TestCompileDataTemplate:
+    def test_compile_writes_data_template(self, tmp_path):
+        """Compile produces a data YAML template alongside the solver."""
+        fixture = load_fixture("transportation")
+        model_file = tmp_path / "mymodel.md"
+        model_file.write_text("# Test model")
+        out_dir = tmp_path / "out"
+
+        with (
+            patch("md2mip.compiler.parse_model", return_value=fixture),
+            patch("md2mip.cli.OUT_DIR", out_dir),
+        ):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["compile", str(model_file)])
+
+        assert result.exit_code == 0
+        data_file = out_dir / "mymodel_data.yaml"
+        assert data_file.exists()
+        content = data_file.read_text()
+        assert "Data template" in content
+        assert "I:" in content
+        assert "mymodel_data.yaml" in result.output
+
+    def test_compile_writes_complete_data_when_ir_has_data(self, tmp_path):
+        """When IR has inline data, the data file is complete."""
+        fixture = load_fixture("knapsack")
+        fixture["data"] = {
+            "I": ["item1", "item2", "item3", "item4", "item5"],
+            "v": [4, 2, 10, 1, 2],
+            "w": [12, 1, 4, 1, 2],
+            "W": 15,
+        }
+        model_file = tmp_path / "knapsack.md"
+        model_file.write_text("# Knapsack")
+        out_dir = tmp_path / "out"
+
+        with (
+            patch("md2mip.compiler.parse_model", return_value=fixture),
+            patch("md2mip.cli.OUT_DIR", out_dir),
+        ):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["compile", str(model_file)])
+
+        assert result.exit_code == 0
+        data_file = out_dir / "knapsack_data.yaml"
+        assert data_file.exists()
+        content = data_file.read_text()
+        assert "Data for knapsack" in content
+        assert "item1" in content
+
+
 class TestRunCommand:
+    def test_run_without_data_no_inline_errors(self, tmp_path):
+        """Run without --data and no inline data gives clear error."""
+        fixture = load_fixture("transportation")
+        model_file = tmp_path / "model.md"
+        model_file.write_text("# Test model")
+
+        with patch("md2mip.compiler.parse_model", return_value=fixture):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["run", str(model_file)])
+            assert result.exit_code != 0
+
+    @pytest.mark.solver
+    def test_run_with_inline_data_succeeds(self, tmp_path):
+        """Run without --data succeeds when IR has inline data (README example 1)."""
+        fixture = load_fixture("knapsack")
+        fixture["data"] = {
+            "I": ["item1", "item2", "item3", "item4", "item5"],
+            "v": [4, 2, 10, 1, 2],
+            "w": [12, 1, 4, 1, 2],
+            "W": 15,
+        }
+        model_file = tmp_path / "knapsack.md"
+        model_file.write_text("# Knapsack")
+
+        with patch("md2mip.compiler.parse_model", return_value=fixture):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["run", str(model_file)])
+            assert result.exit_code == 0, f"Output: {result.output}"
+
     def test_run_requires_data(self):
         runner = CliRunner()
         result = runner.invoke(cli, ["run", "nonexistent.md"])

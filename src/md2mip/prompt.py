@@ -38,7 +38,12 @@ Return ONLY valid JSON (no markdown fences, no explanation) with this schema:
       "expression": "sum(x[i,j] for j in J) <= s[i]"
     }
   },
-  "warnings": ["list of ambiguities, assumptions, or potential issues"]
+  "warnings": ["list of ambiguities, assumptions, or potential issues"],
+  "data": {
+    "SET_NAME": ["label1", "label2"],
+    "param_name": [1.0, 2.0],
+    "scalar_param": 42.0
+  }
 }
 ```
 
@@ -134,9 +139,17 @@ Output:
       "expression": "sum(x[i,j] for i in I) >= d[j]"
     }
   },
-  "warnings": []
+  "warnings": [],
+  "data": {}
 }
 ```
+
+### Inline Data
+- If the markdown contains explicit numeric values for parameters, extract them into `"data"`.
+- Sets: provide string labels. If only a count is given (e.g., "5 items"), generate labels like `["item1", "item2", ..., "item5"]`.
+- Indexed parameters: provide as a list (1-D) or nested list (2-D+) matching set dimensions.
+- Scalar parameters: provide as a single number.
+- If no inline data is present, set `"data": {}`.
 
 ### Warnings
 Populate the `warnings` list when you encounter any of the following:

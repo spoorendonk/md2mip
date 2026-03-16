@@ -6,31 +6,17 @@ Compile natural-language optimization models (Markdown) into standalone Python+H
 markdown → (LLM) → IR → codegen → Python + HiGHS
 ```
 
-## Quick example
+## Examples
 
-`models/knapsack.md`:
+### 1. Quick run — data in markdown (knapsack)
 
-> # 0-1 Knapsack
->
-> We have 5 items. Knapsack capacity W=15.
->
-> Values: $v = (4, 2, 10, 1, 2)$
->
-> Weights: $w = (12, 1, 4, 1, 2)$
->
-> Pick items to maximize value:
->
-> $$\max \sum_{i=1}^{5} v_i x_i$$
-> $$\text{s.t.} \quad \sum_{i=1}^{5} w_i x_i \leq W$$
-> $$x_i \in \{0, 1\}$$
+`models/knapsack.md` contains inline data (values, weights, capacity). One command:
 
 ```bash
-# Compile a knapsack model
-md2mip compile models/knapsack.md
-
-# Run it with data
-python out/knapsack_solver.py data/knapsack.yaml
+md2mip run models/knapsack.md
 ```
+
+The LLM extracts the data automatically. Output:
 
 ```
 Status: optimal
@@ -41,6 +27,31 @@ Solution:
   x[item3] = 1.0
   x[item4] = 1.0
   x[item5] = 1.0
+```
+
+### 2. Compile + run with different data (transportation)
+
+```bash
+# Compile — generates solver script AND data template
+md2mip compile models/transportation.md
+
+# Run with the generated default data
+python out/transportation_solver.py out/transportation_data.yaml
+
+# Run with a larger instance
+python out/transportation_solver.py data/transportation_large.yaml
+```
+
+`compile` always writes two files:
+- `out/<name>_solver.py` — standalone solver script
+- `out/<name>_data.yaml` — complete data (if model has inline data) or template to fill in
+
+### 3. OCR full pipeline
+
+```bash
+md2mip ocr photo.png -o model.md
+md2mip compile model.md
+python out/model_solver.py out/model_data.yaml
 ```
 
 ## Install

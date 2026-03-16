@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 from md2mip.codegen import generate
+from md2mip.data_template import generate_data_template
 from md2mip.ir import IR
 from md2mip.llm import DEFAULT_MODEL, parse_model
 
@@ -33,11 +34,37 @@ def compile_to_python(markdown: str = "", model: str = DEFAULT_MODEL, ir: IR | N
     return generate(ir)
 
 
+def write_data_template(ir: IR, out_path: str | Path) -> None:
+    """Write a data YAML file (complete or template) for the given IR."""
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(generate_data_template(ir))
+
+
 def run_model(
-    markdown: str, data_path: str, model: str = DEFAULT_MODEL
+    markdown: str,
+    data_path: str | None = None,
+    model: str = DEFAULT_MODEL,
 ) -> subprocess.CompletedProcess:
-    """Compile markdown and immediately run with data."""
-    code = compile_to_python(markdown, model=model)
+    """Compile markdown and immediately run with data.
+
+    If *data_path* is None and the IR has embedded data, a temporary data
+    file is created automatically.  If no data is available at all, raises
+    ``ValueError``.
+    """
+    ir = compile_to_ir(markdown, model=model)
+    code = compile_to_python(ir=ir)
+
+    tmp_data: Path | None = None
+    if data_path is None:
+        if not ir.data:
+            raise ValueError(
+                "No --data provided and the model has no inline data. Pass a data file with --data."
+            )
+        tmp_data = Path(tempfile.mktemp(suffix=".yaml"))
+        write_data_template(ir, tmp_data)
+        data_path = str(tmp_data)
+
     f = tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False)
     try:
         f.write(code)
@@ -48,6 +75,8 @@ def run_model(
         )
     finally:
         Path(f.name).unlink(missing_ok=True)
+        if tmp_data is not None:
+            tmp_data.unlink(missing_ok=True)
 
 
 def validate_model(
