@@ -1,9 +1,10 @@
 # md2mip
 
-Compile natural-language optimization models (Markdown) into standalone Python+HiGHS solver scripts.
+Compile natural-language optimization models into standalone solver CLIs.
 
 ```
-markdown → (LLM) → IR → codegen → Python + HiGHS
+markdown → (LLM) → IR → codegen → solver CLI (Python + HiGHS)
+image    → (OCR) → markdown → …
 ```
 
 ## Examples
@@ -133,7 +134,7 @@ cp .env.template .env
 
 | Command    | Description                                |
 |------------|--------------------------------------------|
-| `compile`  | Markdown → standalone Python solver script |
+| `compile`  | Markdown → standalone solver CLI            |
 | `run`      | Compile and immediately run with data      |
 | `validate` | Compile, run, check expected objective     |
 | `ocr`      | Extract a math model from an image (LLM vision) |
