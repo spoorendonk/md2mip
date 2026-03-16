@@ -18,9 +18,7 @@ class TestLitellmRetry:
     def test_retries_on_rate_limit(self):
         fn = MagicMock(
             side_effect=[
-                litellm.RateLimitError(
-                    message="rate limited", model="test", llm_provider="test"
-                ),
+                litellm.RateLimitError(message="rate limited", model="test", llm_provider="test"),
                 "ok",
             ]
         )
@@ -48,12 +46,8 @@ class TestLitellmRetry:
     def test_backoff_timing(self):
         fn = MagicMock(
             side_effect=[
-                litellm.RateLimitError(
-                    message="rate limited", model="test", llm_provider="test"
-                ),
-                litellm.RateLimitError(
-                    message="rate limited", model="test", llm_provider="test"
-                ),
+                litellm.RateLimitError(message="rate limited", model="test", llm_provider="test"),
+                litellm.RateLimitError(message="rate limited", model="test", llm_provider="test"),
                 "ok",
             ]
         )

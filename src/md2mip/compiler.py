@@ -20,9 +20,7 @@ def compile_to_ir(markdown: str, model: str = DEFAULT_MODEL) -> IR:
     return ir
 
 
-def compile_to_python(
-    markdown: str = "", model: str = DEFAULT_MODEL, ir: IR | None = None
-) -> str:
+def compile_to_python(markdown: str = "", model: str = DEFAULT_MODEL, ir: IR | None = None) -> str:
     """Compile markdown to standalone Python solver script.
 
     If *ir* is provided, code is generated directly (no LLM call).

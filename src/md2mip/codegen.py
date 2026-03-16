@@ -30,7 +30,6 @@ def generate(ir: IR) -> str:
 # ---------------------------------------------------------------------------
 
 
-
 def _var_size_expr(var: Variable, ir: IR) -> str:
     """Return a Python expression for the number of elements in a variable group."""
     if not var.indices:
@@ -98,9 +97,7 @@ def _load_data(ir: IR) -> str:
             total_size = " * ".join(size_parts)
             lines.append(f'    _v_{pname} = raw["{pname}"]')
             lines.append(f"    if isinstance(_v_{pname}, (int, float)):")
-            lines.append(
-                f'        data["{pname}"] = np.full({total_size}, float(_v_{pname}))'
-            )
+            lines.append(f'        data["{pname}"] = np.full({total_size}, float(_v_{pname}))')
             lines.append("    else:")
             lines.append(f'        data["{pname}"] = np.array(_v_{pname}, dtype=np.float64)')
             if len(param.indices) > 1:
@@ -484,7 +481,13 @@ def _gen_constraint_fn(cname: str, constraint: Constraint, ir: IR) -> str:
     else:
         lines.extend(
             _gen_loop_constraint(
-                lhs_str, op, rhs_str, idx_vars, idx_sets, ir, has_lag=has_lag,
+                lhs_str,
+                op,
+                rhs_str,
+                idx_vars,
+                idx_sets,
+                ir,
+                has_lag=has_lag,
             )
         )
 
@@ -693,7 +696,11 @@ class LinearTerm:
 
     def negated(self) -> LinearTerm:
         return LinearTerm(
-            _negate(self.coeff), self.var_name, self.var_indices, self.iterators, self.lag,
+            _negate(self.coeff),
+            self.var_name,
+            self.var_indices,
+            self.iterators,
+            self.lag,
             self.lag_index,
         )
 
@@ -773,9 +780,7 @@ def _extract_linear_terms(
                     )
                 else:
                     iters: list[tuple[str, str]] = []
-                    result.var_terms.append(
-                        LinearTerm(effective_coeff, vname, vindices, iters)
-                    )
+                    result.var_terms.append(LinearTerm(effective_coeff, vname, vindices, iters))
             else:
                 effective = term if sign == "+" else f"-({term})"
                 result.const_terms.append(effective)
