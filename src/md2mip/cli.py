@@ -16,7 +16,20 @@ OUT_DIR = Path("out")
 
 @click.group()
 def cli():
-    """md2mip — compile Markdown/LaTeX MIP models into standalone Python solver scripts."""
+    """md2mip — compile Markdown/LaTeX MIP models into standalone Python solver scripts.
+
+    \b
+    Workflow:
+      md2mip compile model.md           → out/<name>_solver.py
+      python out/<name>_solver.py data.yaml
+      md2mip run model.md --data d.yaml → compile + run in one step
+      md2mip validate model.md --data d.yaml --expect-objective 42.0
+
+    \b
+    Exit codes:
+      0  Success
+      1  Failure (compilation error, infeasible model, validation mismatch)
+    """
 
 
 @cli.command()
@@ -25,7 +38,19 @@ def cli():
 @click.option("--ir-only", is_flag=True, help="Output IR JSON instead of Python")
 @click.option("--model", default=DEFAULT_MODEL, help=f"LLM model string (default: {DEFAULT_MODEL})")
 def compile(model_path: str, output: str | None, ir_only: bool, model: str):
-    """Compile a markdown model to a standalone Python solver script."""
+    """Compile a markdown model to a standalone Python solver script.
+
+    \b
+    Outputs (stderr): "Parsed: N sets, N params, N vars, N constraints"
+    Outputs (stdout): file path written, or IR JSON if --ir-only and no -o
+    Default output:   out/<stem>_solver.py
+
+    \b
+    Examples:
+      md2mip compile models/knapsack.md
+      md2mip compile models/knapsack.md -o solver.py
+      md2mip compile models/knapsack.md --ir-only > model.ir.json
+    """
     markdown = Path(model_path).read_text()
 
     ir = compile_to_ir(markdown, model=model)
@@ -69,7 +94,21 @@ def compile(model_path: str, output: str | None, ir_only: bool, model: str):
 )
 @click.option("--model", default=DEFAULT_MODEL, help=f"LLM model string (default: {DEFAULT_MODEL})")
 def run(model_path: str, data: str, model: str):
-    """Compile and immediately run a model with data."""
+    """Compile and immediately run a model with data.
+
+    \b
+    Solver stdout format:
+      Status: optimal|infeasible|<status>
+      Objective: <float>
+      Solution:
+        var[label] = <float>    (indexed variables)
+        var = <float>           (scalar variables)
+    Exit code is forwarded from the solver subprocess.
+
+    \b
+    Examples:
+      md2mip run models/knapsack.md --data data/knapsack.yaml
+    """
     markdown = Path(model_path).read_text()
     result = run_model(markdown, data, model=model)
     sys.exit(result.returncode)
@@ -80,7 +119,17 @@ def run(model_path: str, data: str, model: str):
 @click.option("-o", "--output", type=click.Path(), default=None, help="Output file path")
 @click.option("--model", default=DEFAULT_MODEL, help=f"LLM model string (default: {DEFAULT_MODEL})")
 def ocr(image_path: str, output: str | None, model: str):
-    """Extract a math model from an image using LLM vision."""
+    """Extract a math model from an image using LLM vision.
+
+    \b
+    Outputs (stdout): extracted markdown (or written to -o path)
+    Exit code: 0 on success, 1 on LLM error.
+
+    \b
+    Examples:
+      md2mip ocr photo.png
+      md2mip ocr photo.png -o model.md
+    """
     result = ocr_image(image_path, model=model)
 
     if output:
@@ -99,7 +148,19 @@ def ocr(image_path: str, output: str | None, model: str):
 @click.option("--tol", default=0.01, type=float, help="Absolute tolerance (default: 0.01)")
 @click.option("--model", default=DEFAULT_MODEL, help=f"LLM model string (default: {DEFAULT_MODEL})")
 def validate(model_path: str, data: str, expect_objective: float, tol: float, model: str):
-    """Validate a model: compile, run, check objective value."""
+    """Validate a model: compile, run, check objective value.
+
+    \b
+    Outputs (stdout):
+      PASS (expected=<float>, actual=<float>, tol=<float>)
+      FAIL (expected=<float>, actual=<float>|N/A, tol=<float>)
+    Exit code: 0 on PASS, 1 on FAIL.
+
+    \b
+    Examples:
+      md2mip validate models/knapsack.md --data data/knapsack.yaml --expect-objective 42.0
+      md2mip validate models/knapsack.md --data data/knapsack.yaml --expect-objective 42.0 --tol 0.1
+    """
     markdown = Path(model_path).read_text()
     passed, actual, stdout = validate_model(markdown, data, expect_objective, tol=tol, model=model)
     if passed:

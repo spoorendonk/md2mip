@@ -1,14 +1,41 @@
 # md2mip
 
+Markdown → MIP: compiles natural-language optimization models (markdown)
+into standalone Python solver scripts using HiGHS via an LLM-generated IR.
+
 ## Quick Reference
 
 ```bash
-# build
-make
-
-# test
-make test
+make              # create venv, install deps
+make test         # offline tests (no LLM)
+make test-llm     # LLM integration tests (needs API key)
+make lint         # ruff check
+make fmt          # ruff format
+make typecheck    # mypy
 ```
+
+## Architecture
+
+```
+markdown → (LLM) → IR (JSON) → codegen → standalone Python + HiGHS
+```
+
+Key files:
+- `src/md2mip/codegen.py` — IR → Python code generation (core)
+- `src/md2mip/compiler.py` — orchestrator: markdown → IR → Python
+- `src/md2mip/ir.py` — IR dataclasses (Variable, Constraint, Objective, etc.)
+- `src/md2mip/llm.py` — LLM calls (litellm)
+- `tests/conftest.py` — shared test helpers; `FIXTURES_DIR`, `DATA_DIR`, `load_fixture()`
+- `fixtures/` — IR JSON fixtures for each model
+- `data/` — YAML/JSON data files for each model
+
+## Testing
+
+- `@pytest.mark.llm` — tests requiring LLM API (skipped by default)
+- `@pytest.mark.solver` — tests requiring HiGHS (run by default)
+- Fixtures: `fixtures/<model>.ir.json` loaded via `load_fixture("<model>")`
+- Data: `data/<model>.yaml` or `data/<model>.json`
+- Models with full coverage: knapsack, transportation, blending, etc.
 
 ## Git
 
