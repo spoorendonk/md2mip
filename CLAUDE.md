@@ -6,7 +6,7 @@ into standalone Python solver scripts using HiGHS via an LLM-generated IR.
 ## Quick Reference
 
 ```bash
-make              # create venv, install deps
+make              # create venv, install deps (run first — all other targets depend on it)
 make test         # offline tests (no LLM)
 make test-llm     # LLM integration tests (needs API key)
 make lint         # ruff check
@@ -36,6 +36,34 @@ Key files:
 - Fixtures: `fixtures/<model>.ir.json` loaded via `load_fixture("<model>")`
 - Data: `data/<model>.yaml` or `data/<model>.json`
 - Models with full coverage: knapsack, transportation, blending, etc.
+
+## Pre-commit gate
+
+Always run before committing: `make test && make lint && make fmt && make typecheck`
+Don't commit formatting separately — run `make fmt` first, then commit everything together.
+
+## Codegen invariant
+
+`codegen.py` generates Python code as strings. When refactoring codegen,
+the generated solver output must remain functionally identical — verify
+by running `make test` which exercises all model types (single constraint,
+loop constraint, lag constraint, Big-M, etc.).
+
+## Output contract
+
+Generated solver stdout format is a machine-parseable contract:
+```
+Status: optimal|infeasible|<status>
+Objective: <float>
+Solution:
+  var[label] = <float>
+```
+Do not change this format without updating tests and CLI docs.
+
+## Self-review
+
+Run `/review` on your own PRs before requesting merge.
+Fix issues found before asking the user.
 
 ## Git
 
