@@ -1,0 +1,19 @@
+# 2 generators, 4 time periods
+# Optimal: Gen 0 on for all 4 periods, Gen 1 off
+#   T=0: p[0,0]=5, startup v[0,0]=1 → cost = 50+30 = 80
+#   T=1: p[0,1]=10                   → cost = 100
+#   T=2: p[0,2]=8                    → cost = 80
+#   T=3: p[0,3]=4                    → cost = 40
+# Total = 300.0
+
+G: [0, 1]
+T: [0, 1, 2, 3]
+
+cost: [10, 20]
+p_min: [2, 3]
+p_max: [10, 8]
+ramp_up: [5, 4]
+startup_cost: [30, 20]
+demand: [5, 10, 8, 4]
+p_init: [0, 0]
+u_init: [0, 0]

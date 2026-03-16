@@ -63,7 +63,18 @@ import numpy as np
 import yaml
 
 CONSTRAINT_NAMES = {{}}
-VARIABLE_NAMES = {{}}'''
+VARIABLE_NAMES = {{}}
+
+
+def _merge_row(idx, val):
+    """Merge duplicate column indices by summing their coefficients."""
+    if not idx:
+        return idx, val
+    merged = {{}}
+    for c, v in zip(idx, val):
+        merged[c] = merged.get(c, 0.0) + v
+    cols = sorted(c for c, v in merged.items() if abs(v) > 1e-15)
+    return cols, [merged[c] for c in cols]'''
 
 
 def _load_data(ir: IR) -> str:
@@ -82,14 +93,18 @@ def _load_data(ir: IR) -> str:
     for pname, param in ir.parameters.items():
         if param.indices:
             # Handle scalar-in-YAML for indexed params (broadcast to array)
-            set_name = param.indices[0]
+            size_parts = [f'len(data["{s}"])' for s in param.indices]
+            total_size = " * ".join(size_parts)
             lines.append(f'    _v_{pname} = raw["{pname}"]')
             lines.append(f"    if isinstance(_v_{pname}, (int, float)):")
             lines.append(
-                f'        data["{pname}"] = np.full(len(data["{set_name}"]), float(_v_{pname}))'
+                f'        data["{pname}"] = np.full({total_size}, float(_v_{pname}))'
             )
             lines.append("    else:")
             lines.append(f'        data["{pname}"] = np.array(_v_{pname}, dtype=np.float64)')
+            if len(param.indices) > 1:
+                shape = ", ".join(size_parts)
+                lines.append(f'    data["{pname}"] = data["{pname}"].reshape({shape})')
         else:
             if param.default is not None:
                 lines.append(f'    data["{pname}"] = float(raw.get("{pname}", {param.default}))')
@@ -252,6 +267,14 @@ def _split_top_level_sums(expr: str) -> list[str]:
 def _gen_obj_term(term: str, ir: IR) -> list[str]:
     """Generate code for one sum(...) term in the objective."""
     lines = []
+
+    # Constant objective (e.g. "0") — coefficients stay zero
+    try:
+        float(term.strip())
+        return []
+    except ValueError:
+        pass
+
     # Parse: sum(body for idx1 in Set1 for idx2 in Set2)
     m = re.match(r"sum\((.+)\)", term, re.DOTALL)
     if not m:
@@ -452,8 +475,8 @@ def _gen_constraint_fn(cname: str, constraint: Constraint, ir: IR) -> str:
     # Determine iteration space
     idx_vars, idx_sets = _parse_for_all(constraint.for_all)
 
-    # Check for special case: lag references (t-1)
-    has_lag = "t-1" in constraint.expression or "t - 1" in constraint.expression
+    # Check for special case: lag references like x[t-1] or p[g,t-1]
+    has_lag = bool(re.search(r"\[[^\]]*\w+\s*-\s*\d+", constraint.expression))
 
     if has_lag and not constraint.for_all:
         # Single constraint with lag reference at t=0 (balance_first)
@@ -518,6 +541,7 @@ def _gen_single_constraint(lhs_str: str, op: str, rhs_str: str, ir: IR) -> list[
     rhs_code = _substitute_params(rhs_code, ir)
     lb, ub = _bounds_from_op(op, rhs_code)
 
+    lines.append("    row_indices, row_values = _merge_row(row_indices, row_values)")
     lines.append(f"    row_lower = np.array([{lb}])")
     lines.append(f"    row_upper = np.array([{ub}])")
     lines.append("    starts = np.array([0, len(row_indices)], dtype=np.int32)")
@@ -582,6 +606,7 @@ def _gen_normal_constraint(
     rhs_code = _substitute_params(rhs_code, ir)
     lb, ub = _bounds_from_op(op, rhs_code)
 
+    lines.append(f"{indent}row_idx, row_val = _merge_row(row_idx, row_val)")
     lines.append(f"{indent}all_row_lower.append({lb})")
     lines.append(f"{indent}all_row_upper.append({ub})")
     lines.append(f"{indent}all_indices.extend(row_idx)")
@@ -616,36 +641,35 @@ def _gen_lag_constraint(
     lines.append("    all_values = []")
     lines.append("    starts = [0]")
 
-    # Check if there's a separate _first constraint — if so start from 1
+    # Parse both sides first to determine which indices have lags
+    lhs_terms = _extract_linear_terms(lhs_str, ir, mode="with_lags")
+    rhs_terms = _extract_linear_terms(rhs_str, ir, mode="with_lags")
+
+    all_var_terms_pre = lhs_terms.var_terms + [t.negated() for t in rhs_terms.var_terms]
+
+    # Collect lag indices from all terms
+    lag_indices = {t.lag_index for t in all_var_terms_pre if t.lag and t.lag_index}
+
+    # Check if there's a separate _first constraint — if so, lagged iterators start from 1
     has_first = any("_first" in cn for cn in ir.constraints)
 
-    start_idx = "1" if has_first else "0"
     indent = "    "
     for iv, iset in zip(idx_vars, idx_sets, strict=True):
-        lines.append(f"{indent}for {iv} in range({start_idx}, n_{iset.lower()}):")
+        start = "1" if iv in lag_indices and has_first else "0"
+        lines.append(f"{indent}for {iv} in range({start}, n_{iset.lower()}):")
         indent += "    "
-
-    # Parse the expression, handling t-1 references
-    # e.g., Inv[t] == Inv[t-1] + x[t] - d[t]
-    # becomes: Inv[t] - Inv[t-1] - x[t] == -d[t]
-    # which means: coeff 1 for Inv[t], coeff -1 for Inv[t-1], coeff -1 for x[t], rhs = -d[t]
 
     lines.append(f"{indent}row_idx = []")
     lines.append(f"{indent}row_val = []")
 
-    # Parse both sides
-    lhs_terms = _extract_linear_terms(lhs_str, ir, mode="with_lags")
-    rhs_terms = _extract_linear_terms(rhs_str, ir, mode="with_lags")
-
-    all_var_terms = lhs_terms.var_terms + [t.negated() for t in rhs_terms.var_terms]
     rhs_const = rhs_terms.const_terms + [f"-({c})" for c in lhs_terms.const_terms]
 
-    for t in all_var_terms:
+    for t in all_var_terms_pre:
         offset = _offset_expr(t.var_name, ir)
         # Adjust index for lag
         adjusted_indices = []
         for idx in t.var_indices:
-            if t.lag and idx == idx_vars[0]:  # primary iterator with lag
+            if t.lag and idx == t.lag_index:  # iterator with lag
                 adjusted_indices.append(f"{idx} - {t.lag}")
             else:
                 adjusted_indices.append(idx)
@@ -702,6 +726,7 @@ def _gen_single_constraint_with_lag(
     rhs_code = _substitute_params(rhs_code, ir)
     lb, ub = _bounds_from_op(op, rhs_code)
 
+    lines.append("    row_indices, row_values = _merge_row(row_indices, row_values)")
     lines.append(f"    row_lower = np.array([{lb}])")
     lines.append(f"    row_upper = np.array([{ub}])")
     lines.append("    starts = np.array([0, len(row_indices)], dtype=np.int32)")
@@ -720,7 +745,7 @@ def _gen_single_constraint_with_lag(
 class LinearTerm:
     """A single variable term extracted from a linear expression."""
 
-    __slots__ = ("coeff", "var_name", "var_indices", "iterators", "lag")
+    __slots__ = ("coeff", "var_name", "var_indices", "iterators", "lag", "lag_index")
 
     def __init__(
         self,
@@ -729,16 +754,19 @@ class LinearTerm:
         var_indices: list[str],
         iterators: list[tuple[str, str]] | None = None,
         lag: int = 0,
+        lag_index: str = "",
     ):
         self.coeff = coeff
         self.var_name = var_name
         self.var_indices = var_indices
         self.iterators = iterators or []
         self.lag = lag
+        self.lag_index = lag_index
 
     def negated(self) -> LinearTerm:
         return LinearTerm(
-            _negate(self.coeff), self.var_name, self.var_indices, self.iterators, self.lag
+            _negate(self.coeff), self.var_name, self.var_indices, self.iterators, self.lag,
+            self.lag_index,
         )
 
 
@@ -802,16 +830,18 @@ def _extract_linear_terms(
 
                 if mode == "with_lags":
                     lag = 0
+                    lag_index = ""
                     new_indices = []
                     for idx in vindices:
                         lag_m = re.match(r"(\w+)\s*-\s*(\d+)", idx)
                         if lag_m:
                             new_indices.append(lag_m.group(1))
                             lag = int(lag_m.group(2))
+                            lag_index = lag_m.group(1)
                         else:
                             new_indices.append(idx)
                     result.var_terms.append(
-                        LinearTerm(effective_coeff, vname, new_indices, [], lag)
+                        LinearTerm(effective_coeff, vname, new_indices, [], lag, lag_index)
                     )
                 else:
                     iters: list[tuple[str, str]] = []

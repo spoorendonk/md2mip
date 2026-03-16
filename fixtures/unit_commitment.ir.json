@@ -1,0 +1,75 @@
+{
+  "name": "unit_commitment",
+  "sets": {
+    "G": { "description": "generators" },
+    "T": { "description": "time periods" }
+  },
+  "parameters": {
+    "cost": { "indices": ["G"], "description": "per-MW generation cost" },
+    "p_min": { "indices": ["G"], "description": "minimum output when on" },
+    "p_max": { "indices": ["G"], "description": "maximum output" },
+    "ramp_up": { "indices": ["G"], "description": "max ramp-up between periods" },
+    "startup_cost": { "indices": ["G"], "description": "startup cost" },
+    "demand": { "indices": ["T"], "description": "load requirement" },
+    "p_init": { "indices": ["G"], "description": "initial output (before horizon)" },
+    "u_init": { "indices": ["G"], "description": "initial on/off status" }
+  },
+  "variables": {
+    "p": {
+      "indices": ["G", "T"],
+      "type": "continuous",
+      "lower_bound": 0,
+      "upper_bound": null,
+      "description": "power output"
+    },
+    "u": {
+      "indices": ["G", "T"],
+      "type": "binary",
+      "lower_bound": 0,
+      "upper_bound": 1,
+      "description": "1 if generator on"
+    },
+    "v": {
+      "indices": ["G", "T"],
+      "type": "binary",
+      "lower_bound": 0,
+      "upper_bound": 1,
+      "description": "1 if generator starts up"
+    }
+  },
+  "objective": {
+    "sense": "minimize",
+    "expression": "sum(cost[g] * p[g,t] + startup_cost[g] * v[g,t] for g in G for t in T)"
+  },
+  "constraints": {
+    "demand": {
+      "for_all": ["t in T"],
+      "expression": "sum(p[g,t] for g in G) >= demand[t]"
+    },
+    "min_output": {
+      "for_all": ["g in G", "t in T"],
+      "expression": "p[g,t] >= p_min[g] * u[g,t]"
+    },
+    "max_output": {
+      "for_all": ["g in G", "t in T"],
+      "expression": "p[g,t] <= p_max[g] * u[g,t]"
+    },
+    "ramp_first": {
+      "for_all": ["g in G"],
+      "expression": "p[g,0] - p_init[g] <= ramp_up[g]"
+    },
+    "ramp": {
+      "for_all": ["g in G", "t in T"],
+      "expression": "p[g,t] - p[g,t-1] <= ramp_up[g]"
+    },
+    "startup_first": {
+      "for_all": ["g in G"],
+      "expression": "v[g,0] >= u[g,0] - u_init[g]"
+    },
+    "startup": {
+      "for_all": ["g in G", "t in T"],
+      "expression": "v[g,t] >= u[g,t] - u[g,t-1]"
+    }
+  },
+  "warnings": ["ramp/startup constraints use t-1 lag; ramp_first/startup_first handle t=0"]
+}

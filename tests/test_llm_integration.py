@@ -42,6 +42,12 @@ EXPECTED_OPTIMA = {
     "nasty_capital_budgeting": 115.0,
     "nasty_set_covering": 140.0,
     "nasty_graph_coloring": 3.0,
+    "sudoku": 0.0,
+    "multicommodity_flow": 14.0,
+    "unit_commitment": 300.0,
+    "nasty_sudoku": 0.0,
+    "nasty_multicommodity_flow": 14.0,
+    "nasty_unit_commitment": 300.0,
 }
 
 # Lot sizing doesn't have a single known optimum, just a feasibility bound
@@ -56,6 +62,9 @@ DATA_FILE_MAP = {
     "nasty_capital_budgeting": "capital_budgeting",
     "nasty_set_covering": "set_covering",
     "nasty_graph_coloring": "graph_coloring",
+    "nasty_sudoku": "sudoku",
+    "nasty_multicommodity_flow": "multicommodity_flow",
+    "nasty_unit_commitment": "unit_commitment",
 }
 
 ALL_STANDARD_MODELS = [
@@ -68,6 +77,9 @@ ALL_STANDARD_MODELS = [
     "capital_budgeting",
     "set_covering",
     "graph_coloring",
+    "sudoku",
+    "multicommodity_flow",
+    "unit_commitment",
 ]
 
 NASTY_MODELS = [
@@ -80,6 +92,9 @@ NASTY_MODELS = [
     "nasty_capital_budgeting",
     "nasty_set_covering",
     "nasty_graph_coloring",
+    "nasty_sudoku",
+    "nasty_multicommodity_flow",
+    "nasty_unit_commitment",
 ]
 
 
@@ -150,6 +165,9 @@ class TestLLMEndToEnd:
             "capital_budgeting",
             "set_covering",
             "graph_coloring",
+            "sudoku",
+            "multicommodity_flow",
+            "unit_commitment",
         ]
         + NASTY_MODELS,
     )

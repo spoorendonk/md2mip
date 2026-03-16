@@ -163,66 +163,16 @@ Small, isolated fixes. Low risk.
 ### Verify
 All tests pass
 
-## Phase 9: Simple Models + Confidence Report
+## Phase 9: Simple Models + Confidence Report ✅
 
-### 9a. Confidence report feature
+Committed as `6c36835`. 96 offline tests pass.
 
-Add a warnings/confidence summary printed during `md2mip compile`. The IR already has a `warnings: list[str]` field that the LLM can populate. Surface it:
-
-- **`compiler.py`**: After `compile_to_ir()`, print any `ir.warnings` to stderr
-- **`cli.py`**: In `compile` command, after compilation print a summary:
-  - `"Parsed: {n} sets, {n} params, {n} vars, {n} constraints"`
-  - If `ir.warnings`: print each warning prefixed with `"WARNING: "`
-  - If no warnings: `"Confidence: high (no warnings)"`
-- **`prompt.py`**: Strengthen the warnings instruction — tell the LLM to flag:
-  - Ambiguous variable domains (continuous vs integer vs binary)
-  - Missing bounds or unclear constraints
-  - Contradictory text vs formulas
-  - Assumptions made about notation
-
-### 9b. New models (3 simple ones)
-
-**1. Capital Budgeting** (`capital_budgeting`)
-- 6 projects, 3 periods, select at most 3
-- Cardinality: `sum(y[p] for p in P) <= max_projects`
-- Implication: `y[3] <= y[1]` (project 3 requires project 1)
-- Mutual exclusion: `y[4] + y[5] <= 1`
-- Budget per period: `sum(cost[p,t] * y[p] for p in P) <= budget[t]`
-- Nasty variant: Written as a business memo with vague language ("we can't afford more than three initiatives", "the database migration depends on the cloud move")
-
-**2. Set Covering** (`set_covering`)
-- 10 regions, 7 candidate facilities, sparse 0/1 coverage matrix
-- Coverage: `sum(a[i,j] * y[j] for j in J) >= 1` for all i
-- Minimize: `sum(cost[j] * y[j] for j in J)`
-- Nasty variant: Presented as a table-only problem ("which fire stations cover which neighborhoods") with no math at all
-
-**3. Graph Coloring** (`graph_coloring`)
-- 6 vertices, 4 colors, ~8 edges
-- Binary: `x[v,k]` (vertex v gets color k)
-- Assignment: `sum(x[v,k] for k in K) == 1`
-- Conflict: `x[u,k] + x[v,k] <= 1` for edges (u,v)
-- Minimize colors: `sum(used[k] for k in K)` with `x[v,k] <= used[k]`
-- Nasty variant: Described as a radio frequency assignment problem ("adjacent towers can't use the same channel")
-
-### 9c. For each model
-- `models/<name>.md` — clean markdown with LaTeX math
-- `models/nasty_<name>.md` — ambiguous/sloppy variant
-- `data/<name>.yaml` — small instance, hand-verified optimal
-- `fixtures/<name>.ir.json` — hand-crafted expected IR
-- Image generation: add to `tests/generate_test_images.py` (both plain + rendered)
-- Tests: add to `test_ir.py`, `test_codegen.py`, `test_generated.py`, `test_llm_integration.py`
-
-### Files to modify
-- `src/md2mip/cli.py` — confidence report in compile command
-- `src/md2mip/prompt.py` — strengthen warnings instructions
-- `tests/generate_test_images.py` — add new models
-- `tests/test_ir.py` — add to parametrize
-- `tests/test_codegen.py` — add to parametrize
-- `tests/test_generated.py` — add test classes
-- `tests/test_llm_integration.py` — add to EXPECTED_OPTIMA + parametrize
-
-### Verify
-`make test && make lint && make typecheck`
+- Confidence report: `compile` prints parsed counts + warnings to stderr
+- Prompt: strengthened warnings instructions (ambiguous domains, missing bounds, contradictions, notation assumptions)
+- `compile_to_python()` accepts optional pre-compiled `ir` to avoid double LLM calls
+- 3 new models: capital_budgeting (opt=115), set_covering (opt=140), graph_coloring (opt=3)
+- Each with clean markdown, nasty variant, data, fixture, image generation, full test coverage
+- Key constructs: cardinality, implication, mutual exclusion, adjacency-weighted conflict, color-usage linking
 
 ---
 
