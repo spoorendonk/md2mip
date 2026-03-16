@@ -176,48 +176,20 @@ Committed as `6c36835`. 96 offline tests pass.
 
 ---
 
-## Phase 10: Multi-Period + Network Models
+## Phase 10: Multi-Period + Network Models ✅
 
-### New models (3)
+PR #5. 111 offline tests pass.
 
-**4. Unit Commitment** (`unit_commitment`)
-- 3 generators, 6 time periods
-- Vars: `p[g,t]` (power output), `u[g,t]` (on/off binary), `v[g,t]` (startup binary)
-- Ramp-up: `p[g,t] - p[g,t-1] <= ramp_up[g]`
-- Min/max output: `p_min[g] * u[g,t] <= p[g,t]`, `p[g,t] <= p_max[g] * u[g,t]`
-- Startup logic: `v[g,t] >= u[g,t] - u[g,t-1]`
-- Demand: `sum(p[g,t] for g in G) >= demand[t]`
-- **New constructs:** ramp-rate difference constraints, startup coupling, param*binary bounding continuous
-- Nasty variant: Power plant operator's notes with informal ramp descriptions ("Unit B can't increase more than 30MW per hour")
-
-**5. Multi-Commodity Flow** (`multicommodity_flow`)
-- 4 nodes, ~6 arcs, 2 commodities
-- Vars: `flow[i,j,k]` — 3-index
-- Flow conservation: `sum(flow[i,j,k] for j out) - sum(flow[j,i,k] for j in) == supply[i,k]`
-- Shared capacity: `sum(flow[i,j,k] for k in K) <= capacity[i,j]`
-- **New constructs:** 3-index variables, difference-of-sums, shared capacity
-- Nasty variant: Drawn as a network diagram description ("pipes carry oil and gas, each pipe has a max throughput")
-
-**6. Sudoku** (`sudoku`)
-- 4x4 mini-sudoku (sets 1..4), ~6 given clues
-- Vars: `x[i,j,k]` binary — 3-index
-- One per cell: `sum(x[i,j,k] for k in K) == 1`
-- Row/col/block uniqueness via == 1 constraints
-- Objective: `minimize 0` (pure feasibility)
-- **New constructs:** pure feasibility, 3-index binary, all-different
-- Nasty variant: Just a partially-filled grid image, minimal text ("solve this puzzle")
-
-### Codegen changes likely needed
-- 3D array loading in `_load_data` for 3-index params
-- `minimize 0` objective handling (constant objective)
-- Ramp constraints: existing lag machinery from lot_sizing should handle `t-1` patterns
-- `param * binary_var` products (e.g., `p_min[g] * u[g,t]`) in constraint expressions — may need `_parse_product` to handle param*var on constraint RHS
-
-### For each model
-Same deliverables as Phase 9: markdown, nasty variant, data, fixture, images, tests.
-
-### Verify
-`make test && make lint && make typecheck`
+- 3 new models: sudoku (opt=0, feasibility), multicommodity_flow (opt=14), unit_commitment (opt=300)
+- Each with clean markdown, nasty variant, data, fixture, full test coverage
+- Key constructs: 3-index binary/continuous vars, pure feasibility, difference-of-sums, multi-index lags, param×binary products, startup coupling
+- Codegen fixes:
+  - Constant/zero objectives (`minimize 0`) — early return instead of TODO fallthrough
+  - `LinearTerm.lag_index` tracking — lag adjustments target correct iterator, not always first
+  - `start_idx=1` applied per-iterator based on lag_index, not globally
+  - Multi-index parameter reshape (1D→ND) in `_load_data`
+  - `_merge_row` helper deduplicates column indices (needed for sum−sum with self-loops)
+  - Robust lag detection regex `\[[^\]]*\w+\s*-\s*\d+` replaces literal `"t-1"` check
 
 ---
 
@@ -278,5 +250,5 @@ For nasty variants, consider generating "photo-style" images (noisy, rotated) to
 | Phase | Models | Key new constructs |
 |-------|--------|--------------------|
 | 9 | capital_budgeting, set_covering, graph_coloring + confidence report | Cardinality, implication, mutual exclusion, conflict pairs, color-usage linking |
-| 10 | unit_commitment, multicommodity_flow, sudoku | Ramp rates, 3-index vars, startup coupling, pure feasibility, all-different |
+| 10 ✅ | sudoku, multicommodity_flow, unit_commitment | 3-index vars, pure feasibility, sum−sum, multi-index lags, param×binary, startup coupling |
 | 11 | n_queens, job_shop, tsp_mtz | Diagonal conflicts, Big-M disjunctive, MTZ subtour elimination, makespan |
