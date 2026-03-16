@@ -18,7 +18,7 @@ python out/knapsack_solver.py data/knapsack.yaml
 
 ```
 Status: optimal
-Objective: 16.0
+Objective: 15.0
 Solution:
   x[item1] = 0.0
   x[item2] = 1.0
