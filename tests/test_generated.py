@@ -158,6 +158,33 @@ class TestUnitCommitment:
 
 
 @pytest.mark.solver
+class TestNQueens:
+    def test_solves_correctly(self):
+        rc, stdout, stderr = _run_generated("n_queens")
+        assert rc == 0, f"Script failed:\n{stderr}"
+        obj = _extract_objective(stdout)
+        assert abs(obj - 0.0) < 0.01
+
+
+@pytest.mark.solver
+class TestJobShop:
+    def test_solves_correctly(self):
+        rc, stdout, stderr = _run_generated("job_shop")
+        assert rc == 0, f"Script failed:\n{stderr}"
+        obj = _extract_objective(stdout)
+        assert abs(obj - 10.0) < 0.01
+
+
+@pytest.mark.solver
+class TestTspMtz:
+    def test_solves_correctly(self):
+        rc, stdout, stderr = _run_generated("tsp_mtz")
+        assert rc == 0, f"Script failed:\n{stderr}"
+        obj = _extract_objective(stdout)
+        assert abs(obj - 85.0) < 0.01
+
+
+@pytest.mark.solver
 class TestInfeasible:
     def test_infeasible_exit_code(self):
         rc, stdout, stderr = _run_generated("transportation", data_name="transportation_infeasible")

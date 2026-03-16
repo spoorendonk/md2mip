@@ -264,6 +264,9 @@ def main():
     sudoku_md = (MODELS_DIR / "sudoku.md").read_text()
     multicommodity_flow_md = (MODELS_DIR / "multicommodity_flow.md").read_text()
     unit_commitment_md = (MODELS_DIR / "unit_commitment.md").read_text()
+    n_queens_md = (MODELS_DIR / "n_queens.md").read_text()
+    job_shop_md = (MODELS_DIR / "job_shop.md").read_text()
+    tsp_mtz_md = (MODELS_DIR / "tsp_mtz.md").read_text()
 
     # Plain text images (raw markdown as monospace)
     render_text_to_image(knapsack_md, IMAGES_DIR / "clean_knapsack.png")
@@ -286,6 +289,9 @@ def main():
         multicommodity_flow_md, IMAGES_DIR / "rendered_multicommodity_flow.png"
     )
     render_markdown_to_image(unit_commitment_md, IMAGES_DIR / "rendered_unit_commitment.png")
+    render_markdown_to_image(n_queens_md, IMAGES_DIR / "rendered_n_queens.png")
+    render_markdown_to_image(job_shop_md, IMAGES_DIR / "rendered_job_shop.png")
+    render_markdown_to_image(tsp_mtz_md, IMAGES_DIR / "rendered_tsp_mtz.png")
 
     print("Done.")
 

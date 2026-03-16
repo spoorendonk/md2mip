@@ -27,6 +27,9 @@ class TestCodegenSyntax:
             "sudoku",
             "multicommodity_flow",
             "unit_commitment",
+            "n_queens",
+            "job_shop",
+            "tsp_mtz",
         ],
     )
     def test_generates_valid_python(self, name):
@@ -51,6 +54,9 @@ class TestCodegenSyntax:
             "sudoku",
             "multicommodity_flow",
             "unit_commitment",
+            "n_queens",
+            "job_shop",
+            "tsp_mtz",
         ],
     )
     def test_has_required_functions(self, name):
@@ -77,6 +83,9 @@ class TestCodegenSyntax:
             "sudoku",
             "multicommodity_flow",
             "unit_commitment",
+            "n_queens",
+            "job_shop",
+            "tsp_mtz",
         ],
     )
     def test_has_constraint_functions(self, name):

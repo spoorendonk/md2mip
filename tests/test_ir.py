@@ -132,6 +132,9 @@ class TestAllFixturesValid:
             "sudoku",
             "multicommodity_flow",
             "unit_commitment",
+            "n_queens",
+            "job_shop",
+            "tsp_mtz",
         ],
     )
     def test_fixture_validates(self, name):

@@ -1,0 +1,38 @@
+{
+  "name": "n_queens",
+  "sets": {
+    "R": { "description": "rows" },
+    "C": { "description": "columns" }
+  },
+  "parameters": {
+    "diag": { "indices": ["R", "C", "R", "C"], "description": "1 if cells share a diagonal and are distinct" }
+  },
+  "variables": {
+    "x": {
+      "indices": ["R", "C"],
+      "type": "binary",
+      "lower_bound": 0,
+      "upper_bound": 1,
+      "description": "1 if queen placed at (r,c)"
+    }
+  },
+  "objective": {
+    "sense": "minimize",
+    "expression": "0"
+  },
+  "constraints": {
+    "one_per_row": {
+      "for_all": ["r in R"],
+      "expression": "sum(x[r,c] for c in C) == 1"
+    },
+    "one_per_col": {
+      "for_all": ["c in C"],
+      "expression": "sum(x[r,c] for r in R) == 1"
+    },
+    "no_diag": {
+      "for_all": ["r1 in R", "c1 in C", "r2 in R", "c2 in C"],
+      "expression": "diag[r1,c1,r2,c2] * x[r1,c1] + diag[r1,c1,r2,c2] * x[r2,c2] <= 1"
+    }
+  },
+  "warnings": []
+}
