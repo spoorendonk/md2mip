@@ -69,6 +69,8 @@ Written: out/transportation_data.yaml
 Run:     python out/transportation_solver.py out/transportation_data.yaml
 ```
 
+Run the generated solver directly — swap in any data file:
+
 ```bash
 # Run with the generated default data
 python out/transportation_solver.py out/transportation_data.yaml
