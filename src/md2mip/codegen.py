@@ -40,7 +40,7 @@ def _var_size_expr(var: Variable, ir: IR) -> str:
 
 def _total_vars_expr(ir: IR) -> str:
     parts = []
-    for _name, var in ir.variables.items():
+    for var in ir.variables.values():
         parts.append(_var_size_expr(var, ir))
     return " + ".join(parts)
 
@@ -478,18 +478,14 @@ def _gen_constraint_fn(cname: str, constraint: Constraint, ir: IR) -> str:
     # Check for special case: lag references like x[t-1] or p[g,t-1]
     has_lag = bool(re.search(r"\[[^\]]*\w+\s*-\s*\d+", constraint.expression))
 
-    if has_lag and not constraint.for_all:
-        # Single constraint with lag reference at t=0 (balance_first)
-        lines.extend(_gen_single_constraint_with_lag(lhs_str, op, rhs_str, constraint, ir))
-    elif has_lag:
-        # Constraint with lag — needs special handling, generate with loops
-        lines.extend(_gen_lag_constraint(lhs_str, op, rhs_str, idx_vars, idx_sets, constraint, ir))
-    elif not constraint.for_all:
-        # Single constraint (no for_all)
-        lines.extend(_gen_single_constraint(lhs_str, op, rhs_str, ir))
+    if not constraint.for_all:
+        lines.extend(_gen_single_constraint(lhs_str, op, rhs_str, ir, has_lag=has_lag))
     else:
-        # Normal constraint group with for_all
-        lines.extend(_gen_normal_constraint(cname, lhs_str, op, rhs_str, idx_vars, idx_sets, ir))
+        lines.extend(
+            _gen_loop_constraint(
+                lhs_str, op, rhs_str, idx_vars, idx_sets, ir, has_lag=has_lag,
+            )
+        )
 
     return "\n".join(lines)
 
@@ -504,85 +500,126 @@ def _parse_for_all(for_all: list[str]) -> tuple[list[str], list[str]]:
     return idx_vars, idx_sets
 
 
-def _gen_single_constraint(lhs_str: str, op: str, rhs_str: str, ir: IR) -> list[str]:
-    """Generate a single constraint (no for_all)."""
-    lines = []
-
-    # Analyze both sides for variable terms
-    lhs_terms = _extract_linear_terms(lhs_str, ir)
-    rhs_terms = _extract_linear_terms(rhs_str, ir)
-
-    # Move all variable terms to LHS, constant terms to RHS
+def _collect_constraint_terms(
+    lhs_str: str,
+    rhs_str: str,
+    ir: IR,
+    mode: Literal["normal", "with_lags", "literal"] = "normal",
+) -> tuple[list[LinearTerm], list[str]]:
+    """Extract and rearrange terms: all variable terms on LHS, constants on RHS."""
+    lhs_terms = _extract_linear_terms(lhs_str, ir, mode=mode)
+    rhs_terms = _extract_linear_terms(rhs_str, ir, mode=mode)
     all_var_terms = lhs_terms.var_terms + [t.negated() for t in rhs_terms.var_terms]
     rhs_const = rhs_terms.const_terms + [f"-({c})" for c in lhs_terms.const_terms]
+    return all_var_terms, rhs_const
 
-    lines.append("    # Build row as a list of (col_index, coefficient)")
+
+def _compute_rhs_code(rhs_const: list[str], ir: IR) -> str:
+    """Join constant terms and substitute parameter references."""
+    rhs_code = " + ".join(rhs_const) if rhs_const else "0"
+    return _substitute_params(rhs_code, ir)
+
+
+def _emit_single_addRows(lines: list[str], indent: str, lb: str, ub: str) -> None:
+    """Append merge + addRows(1, ...) for a single-row constraint."""
+    lines.append(f"{indent}row_indices, row_values = _merge_row(row_indices, row_values)")
+    lines.append(f"{indent}row_lower = np.array([{lb}])")
+    lines.append(f"{indent}row_upper = np.array([{ub}])")
+    lines.append(f"{indent}starts = np.array([0, len(row_indices)], dtype=np.int32)")
+    lines.append(f"{indent}h.addRows(1, row_lower, row_upper, len(row_indices),")
+    lines.append(f"{indent}          starts, np.array(row_indices, dtype=np.int32),")
+    lines.append(f"{indent}          np.array(row_values, dtype=np.float64))")
+
+
+def _emit_batch_addRows(lines: list[str], *, guard: bool = False) -> None:
+    """Append the final n_cons + addRows block for batch constraints."""
+    lines.append("    n_cons = len(all_row_lower)")
+    if guard:
+        lines.append("    if n_cons > 0:")
+        pad = "        "
+    else:
+        pad = "    "
+    lines.append(f"{pad}h.addRows(n_cons, np.array(all_row_lower), np.array(all_row_upper),")
+    lines.append(f"{pad}          len(all_indices), np.array(starts, dtype=np.int32),")
+    lines.append(f"{pad}          np.array(all_indices, dtype=np.int32),")
+    lines.append(f"{pad}          np.array(all_values, dtype=np.float64))")
+
+
+def _gen_single_constraint(
+    lhs_str: str, op: str, rhs_str: str, ir: IR, *, has_lag: bool = False
+) -> list[str]:
+    """Generate a single constraint (no for_all).
+
+    When *has_lag* is True, uses "literal" extraction mode for constraints
+    that reference specific indices (e.g. Inv[0]).
+    """
+    mode: Literal["normal", "literal"] = "literal" if has_lag else "normal"
+    all_var_terms, rhs_const = _collect_constraint_terms(lhs_str, rhs_str, ir, mode)
+
+    lines: list[str] = []
     lines.append("    row_indices = []")
     lines.append("    row_values = []")
 
     for t in all_var_terms:
         offset = _offset_expr(t.var_name, ir)
+        inner_indent = "    "
         if t.iterators:
-            indent = "    "
             for iv, iset in t.iterators:
-                lines.append(f"{indent}for {iv} in range(n_{iset.lower()}):")
-                indent += "    "
-            flat = _flat_index_expr(t.var_name, t.var_indices, ir)
-            coeff_c = _coeff_code(t.coeff, ir)
-            lines.append(f"{indent}row_indices.append({offset} + {flat})")
-            lines.append(f"{indent}row_values.append({coeff_c})")
-        else:
-            flat = _flat_index_expr(t.var_name, t.var_indices, ir)
-            coeff_c = _coeff_code(t.coeff, ir)
-            lines.append(f"    row_indices.append({offset} + {flat})")
-            lines.append(f"    row_values.append({coeff_c})")
+                lines.append(f"{inner_indent}for {iv} in range(n_{iset.lower()}):")
+                inner_indent += "    "
+        flat = _flat_index_expr(t.var_name, t.var_indices, ir)
+        coeff_c = _coeff_code(t.coeff, ir)
+        lines.append(f"{inner_indent}row_indices.append({offset} + {flat})")
+        lines.append(f"{inner_indent}row_values.append({coeff_c})")
 
-    rhs_code = " + ".join(rhs_const) if rhs_const else "0"
-    rhs_code = _substitute_params(rhs_code, ir)
+    rhs_code = _compute_rhs_code(rhs_const, ir)
     lb, ub = _bounds_from_op(op, rhs_code)
-
-    lines.append("    row_indices, row_values = _merge_row(row_indices, row_values)")
-    lines.append(f"    row_lower = np.array([{lb}])")
-    lines.append(f"    row_upper = np.array([{ub}])")
-    lines.append("    starts = np.array([0, len(row_indices)], dtype=np.int32)")
-    lines.append("    h.addRows(1, row_lower, row_upper, len(row_indices),")
-    lines.append("              starts, np.array(row_indices, dtype=np.int32),")
-    lines.append("              np.array(row_values, dtype=np.float64))")
+    _emit_single_addRows(lines, "    ", lb, ub)
 
     return lines
 
 
-def _gen_normal_constraint(
-    cname: str,
+def _gen_loop_constraint(
     lhs_str: str,
     op: str,
     rhs_str: str,
     idx_vars: list[str],
     idx_sets: list[str],
     ir: IR,
+    *,
+    has_lag: bool = False,
 ) -> list[str]:
-    """Generate a constraint group with for_all — one addRows call per iteration."""
-    lines = []
+    """Generate a constraint group with for_all.
 
-    # For multi-index for_all (e.g., i in I, j in J), we generate nested loops
-    # and add one row per iteration
+    When *has_lag* is True, uses "with_lags" extraction mode, adjusts loop
+    start indices, applies lag offsets to variable indices, and guards the
+    final addRows with ``if n_cons > 0``.
+    """
+    mode: Literal["normal", "with_lags"] = "with_lags" if has_lag else "normal"
+    all_var_terms, rhs_const = _collect_constraint_terms(lhs_str, rhs_str, ir, mode)
+
+    lines: list[str] = []
     lines.append("    all_row_lower = []")
     lines.append("    all_row_upper = []")
     lines.append("    all_indices = []")
     lines.append("    all_values = []")
     lines.append("    starts = [0]")
 
+    # Determine loop start adjustments for lag constraints
+    lag_indices: set[str] = set()
+    has_first = False
+    if has_lag:
+        lag_indices = {t.lag_index for t in all_var_terms if t.lag and t.lag_index}
+        has_first = any("_first" in cn for cn in ir.constraints)
+
     indent = "    "
     for iv, iset in zip(idx_vars, idx_sets, strict=True):
-        lines.append(f"{indent}for {iv} in range(n_{iset.lower()}):")
+        if has_lag:
+            start = "1" if iv in lag_indices and has_first else "0"
+            lines.append(f"{indent}for {iv} in range({start}, n_{iset.lower()}):")
+        else:
+            lines.append(f"{indent}for {iv} in range(n_{iset.lower()}):")
         indent += "    "
-
-    # Inside the loop, parse expression and emit row construction
-    lhs_terms = _extract_linear_terms(lhs_str, ir)
-    rhs_terms = _extract_linear_terms(rhs_str, ir)
-
-    all_var_terms = lhs_terms.var_terms + [t.negated() for t in rhs_terms.var_terms]
-    rhs_const = rhs_terms.const_terms + [f"-({c})" for c in lhs_terms.const_terms]
 
     lines.append(f"{indent}row_idx = []")
     lines.append(f"{indent}row_val = []")
@@ -590,149 +627,39 @@ def _gen_normal_constraint(
     for t in all_var_terms:
         offset = _offset_expr(t.var_name, ir)
         inner_indent = indent
-        if t.iterators:
-            # Filter out iterators that are already covered by for_all
+        if not has_lag and t.iterators:
             remaining = [(iv, iset) for iv, iset in t.iterators if iv not in idx_vars]
             for iv, iset in remaining:
                 lines.append(f"{inner_indent}for {iv} in range(n_{iset.lower()}):")
                 inner_indent += "    "
 
-        flat = _flat_index_expr(t.var_name, t.var_indices, ir)
+        if has_lag:
+            adjusted_indices = []
+            for idx in t.var_indices:
+                if t.lag and idx == t.lag_index:
+                    adjusted_indices.append(f"{idx} - {t.lag}")
+                else:
+                    adjusted_indices.append(idx)
+            flat = _flat_index_expr(t.var_name, adjusted_indices, ir)
+        else:
+            flat = _flat_index_expr(t.var_name, t.var_indices, ir)
+
         coeff_c = _coeff_code(t.coeff, ir)
         lines.append(f"{inner_indent}row_idx.append({offset} + {flat})")
         lines.append(f"{inner_indent}row_val.append({coeff_c})")
 
-    rhs_code = " + ".join(rhs_const) if rhs_const else "0"
-    rhs_code = _substitute_params(rhs_code, ir)
+    rhs_code = _compute_rhs_code(rhs_const, ir)
     lb, ub = _bounds_from_op(op, rhs_code)
 
-    lines.append(f"{indent}row_idx, row_val = _merge_row(row_idx, row_val)")
+    if not has_lag:
+        lines.append(f"{indent}row_idx, row_val = _merge_row(row_idx, row_val)")
     lines.append(f"{indent}all_row_lower.append({lb})")
     lines.append(f"{indent}all_row_upper.append({ub})")
     lines.append(f"{indent}all_indices.extend(row_idx)")
     lines.append(f"{indent}all_values.extend(row_val)")
     lines.append(f"{indent}starts.append(len(all_indices))")
 
-    lines.append("    n_cons = len(all_row_lower)")
-    lines.append("    h.addRows(n_cons, np.array(all_row_lower), np.array(all_row_upper),")
-    lines.append("              len(all_indices), np.array(starts, dtype=np.int32),")
-    lines.append("              np.array(all_indices, dtype=np.int32),")
-    lines.append("              np.array(all_values, dtype=np.float64))")
-
-    return lines
-
-
-def _gen_lag_constraint(
-    lhs_str: str,
-    op: str,
-    rhs_str: str,
-    idx_vars: list[str],
-    idx_sets: list[str],
-    constraint: Constraint,
-    ir: IR,
-) -> list[str]:
-    """Generate constraints with lag references like Inv[t-1]."""
-    lines = []
-
-    # For lag constraints, we skip t=0 (handled by balance_first) and iterate t=1..T-1
-    lines.append("    all_row_lower = []")
-    lines.append("    all_row_upper = []")
-    lines.append("    all_indices = []")
-    lines.append("    all_values = []")
-    lines.append("    starts = [0]")
-
-    # Parse both sides first to determine which indices have lags
-    lhs_terms = _extract_linear_terms(lhs_str, ir, mode="with_lags")
-    rhs_terms = _extract_linear_terms(rhs_str, ir, mode="with_lags")
-
-    all_var_terms_pre = lhs_terms.var_terms + [t.negated() for t in rhs_terms.var_terms]
-
-    # Collect lag indices from all terms
-    lag_indices = {t.lag_index for t in all_var_terms_pre if t.lag and t.lag_index}
-
-    # Check if there's a separate _first constraint — if so, lagged iterators start from 1
-    has_first = any("_first" in cn for cn in ir.constraints)
-
-    indent = "    "
-    for iv, iset in zip(idx_vars, idx_sets, strict=True):
-        start = "1" if iv in lag_indices and has_first else "0"
-        lines.append(f"{indent}for {iv} in range({start}, n_{iset.lower()}):")
-        indent += "    "
-
-    lines.append(f"{indent}row_idx = []")
-    lines.append(f"{indent}row_val = []")
-
-    rhs_const = rhs_terms.const_terms + [f"-({c})" for c in lhs_terms.const_terms]
-
-    for t in all_var_terms_pre:
-        offset = _offset_expr(t.var_name, ir)
-        # Adjust index for lag
-        adjusted_indices = []
-        for idx in t.var_indices:
-            if t.lag and idx == t.lag_index:  # iterator with lag
-                adjusted_indices.append(f"{idx} - {t.lag}")
-            else:
-                adjusted_indices.append(idx)
-        flat = _flat_index_expr(t.var_name, adjusted_indices, ir)
-        coeff_c = _coeff_code(t.coeff, ir)
-        lines.append(f"{indent}row_idx.append({offset} + {flat})")
-        lines.append(f"{indent}row_val.append({coeff_c})")
-
-    rhs_code = " + ".join(rhs_const) if rhs_const else "0"
-    rhs_code = _substitute_params(rhs_code, ir)
-    lb, ub = _bounds_from_op(op, rhs_code)
-
-    lines.append(f"{indent}all_row_lower.append({lb})")
-    lines.append(f"{indent}all_row_upper.append({ub})")
-    lines.append(f"{indent}all_indices.extend(row_idx)")
-    lines.append(f"{indent}all_values.extend(row_val)")
-    lines.append(f"{indent}starts.append(len(all_indices))")
-
-    lines.append("    n_cons = len(all_row_lower)")
-    lines.append("    if n_cons > 0:")
-    lines.append("        h.addRows(n_cons, np.array(all_row_lower), np.array(all_row_upper),")
-    lines.append("                  len(all_indices), np.array(starts, dtype=np.int32),")
-    lines.append("                  np.array(all_indices, dtype=np.int32),")
-    lines.append("                  np.array(all_values, dtype=np.float64))")
-
-    return lines
-
-
-def _gen_single_constraint_with_lag(
-    lhs_str: str, op: str, rhs_str: str, constraint: Constraint, ir: IR
-) -> list[str]:
-    """Generate a single constraint that references specific indices (like t=0)."""
-    lines = []
-
-    # This handles constraints like: Inv[0] == I_init + x[0] - d[0]
-    lines.append("    row_indices = []")
-    lines.append("    row_values = []")
-
-    # Parse to find variable references with literal indices
-    lhs_terms = _extract_linear_terms(lhs_str, ir, mode="literal")
-    rhs_terms = _extract_linear_terms(rhs_str, ir, mode="literal")
-
-    all_var_terms = lhs_terms.var_terms + [t.negated() for t in rhs_terms.var_terms]
-    rhs_const = rhs_terms.const_terms + [f"-({c})" for c in lhs_terms.const_terms]
-
-    for t in all_var_terms:
-        offset = _offset_expr(t.var_name, ir)
-        flat = _flat_index_expr(t.var_name, t.var_indices, ir)
-        coeff_c = _coeff_code(t.coeff, ir)
-        lines.append(f"    row_indices.append({offset} + {flat})")
-        lines.append(f"    row_values.append({coeff_c})")
-
-    rhs_code = " + ".join(rhs_const) if rhs_const else "0"
-    rhs_code = _substitute_params(rhs_code, ir)
-    lb, ub = _bounds_from_op(op, rhs_code)
-
-    lines.append("    row_indices, row_values = _merge_row(row_indices, row_values)")
-    lines.append(f"    row_lower = np.array([{lb}])")
-    lines.append(f"    row_upper = np.array([{ub}])")
-    lines.append("    starts = np.array([0, len(row_indices)], dtype=np.int32)")
-    lines.append("    h.addRows(1, row_lower, row_upper, len(row_indices),")
-    lines.append("              starts, np.array(row_indices, dtype=np.int32),")
-    lines.append("              np.array(row_values, dtype=np.float64))")
+    _emit_batch_addRows(lines, guard=has_lag)
 
     return lines
 
@@ -887,7 +814,10 @@ def _split_additive_terms(expr: str) -> list[tuple[str, str]]:
 
 def _has_var_reference(term: str, ir: IR) -> bool:
     """Check if term references any variable."""
-    return any(re.search(rf"\b{re.escape(vname)}\b", term) for vname in ir.variables)
+    if not ir.variables:
+        return False
+    pattern = r"\b(?:" + "|".join(re.escape(v) for v in ir.variables) + r")\b"
+    return bool(re.search(pattern, term))
 
 
 def _parse_product_with_lag(body: str, ir: IR) -> tuple[str, str, list[str]]:
@@ -939,18 +869,24 @@ def _bounds_from_op(op: str, rhs_code: str) -> tuple[str, str]:
 
 def _substitute_params(code: str, ir: IR) -> str:
     """Replace parameter names with data dict lookups."""
+    # Indexed params need individual replacements (capture group references the name)
     for pname in sorted(ir.parameters.keys(), key=len, reverse=True):
         param = ir.parameters[pname]
         if param.indices:
-            # Indexed params: c[i,j] -> data["c"][i,j]
             code = re.sub(
                 rf"\b{re.escape(pname)}\[([^\]]+)\]",
                 f'data["{pname}"][\\1]',
                 code,
             )
-        else:
-            # Scalar params: W -> data["W"]
-            code = re.sub(rf"\b{re.escape(pname)}\b", f'data["{pname}"]', code)
+    # Consolidate all scalar params into a single regex
+    scalar_params = sorted(
+        (p for p, param in ir.parameters.items() if not param.indices),
+        key=len,
+        reverse=True,
+    )
+    if scalar_params:
+        pattern = r"\b(" + "|".join(re.escape(p) for p in scalar_params) + r")\b"
+        code = re.sub(pattern, lambda m: f'data["{m.group(1)}"]', code)
     return code
 
 

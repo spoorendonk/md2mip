@@ -35,11 +35,6 @@ def compile_to_python(
     return generate(ir)
 
 
-def compile_ir_to_python(ir: IR) -> str:
-    """Compile an existing IR to Python (no LLM call)."""
-    return generate(ir)
-
-
 def run_model(
     markdown: str, data_path: str, model: str = DEFAULT_MODEL
 ) -> subprocess.CompletedProcess:
