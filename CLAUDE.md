@@ -7,7 +7,7 @@ into standalone Python solver scripts using HiGHS via an LLM-generated IR.
 
 ```bash
 make              # create venv, install deps
-make test         # 126 offline tests (no LLM)
+make test         # offline tests (no LLM)
 make test-llm     # LLM integration tests (needs API key)
 make lint         # ruff check
 make fmt          # ruff format
@@ -35,7 +35,7 @@ Key files:
 - `@pytest.mark.solver` — tests requiring HiGHS (run by default)
 - Fixtures: `fixtures/<model>.ir.json` loaded via `load_fixture("<model>")`
 - Data: `data/<model>.yaml` or `data/<model>.json`
-- 15 models with full coverage: knapsack, transportation, blending, etc.
+- Models with full coverage: knapsack, transportation, blending, etc.
 
 ## Git
 

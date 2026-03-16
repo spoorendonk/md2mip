@@ -101,7 +101,8 @@ def run(model_path: str, data: str, model: str):
       Status: optimal|infeasible|<status>
       Objective: <float>
       Solution:
-        var[label] = <float>
+        var[label] = <float>    (indexed variables)
+        var = <float>           (scalar variables)
     Exit code is forwarded from the solver subprocess.
 
     \b
@@ -122,6 +123,7 @@ def ocr(image_path: str, output: str | None, model: str):
 
     \b
     Outputs (stdout): extracted markdown (or written to -o path)
+    Exit code: 0 on success, 1 on LLM error.
 
     \b
     Examples:
