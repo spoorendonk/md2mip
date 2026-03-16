@@ -6,7 +6,7 @@ import pytest
 from click.testing import CliRunner
 
 from md2mip.cli import cli
-from tests.conftest import load_fixture
+from tests.conftest import knapsack_fixture_with_data, load_fixture
 
 
 class TestCompileCommand:
@@ -267,13 +267,7 @@ class TestCompileDataTemplate:
 
     def test_compile_writes_complete_data_when_ir_has_data(self, tmp_path):
         """When IR has inline data, the data file is complete."""
-        fixture = load_fixture("knapsack")
-        fixture["data"] = {
-            "I": ["item1", "item2", "item3", "item4", "item5"],
-            "v": [4, 2, 10, 1, 2],
-            "w": [12, 1, 4, 1, 2],
-            "W": 15,
-        }
+        fixture = knapsack_fixture_with_data()
         model_file = tmp_path / "knapsack.md"
         model_file.write_text("# Knapsack")
         out_dir = tmp_path / "out"
@@ -308,13 +302,7 @@ class TestRunCommand:
     @pytest.mark.solver
     def test_run_with_inline_data_succeeds(self, tmp_path):
         """Run without --data succeeds when IR has inline data (README example 1)."""
-        fixture = load_fixture("knapsack")
-        fixture["data"] = {
-            "I": ["item1", "item2", "item3", "item4", "item5"],
-            "v": [4, 2, 10, 1, 2],
-            "w": [12, 1, 4, 1, 2],
-            "W": 15,
-        }
+        fixture = knapsack_fixture_with_data()
         model_file = tmp_path / "knapsack.md"
         model_file.write_text("# Knapsack")
 
@@ -335,13 +323,7 @@ class TestReadmeExamples:
     @pytest.mark.solver
     def test_readme_example1_knapsack_run(self, tmp_path, capfd):
         """README example 1: run knapsack with inline data."""
-        fixture = load_fixture("knapsack")
-        fixture["data"] = {
-            "I": ["item1", "item2", "item3", "item4", "item5"],
-            "v": [4, 2, 10, 1, 2],
-            "w": [12, 1, 4, 1, 2],
-            "W": 15,
-        }
+        fixture = knapsack_fixture_with_data()
         model_file = tmp_path / "knapsack.md"
         model_file.write_text("# Knapsack")
 

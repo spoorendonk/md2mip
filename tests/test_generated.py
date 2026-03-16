@@ -9,7 +9,7 @@ import pytest
 
 from md2mip.codegen import generate
 from md2mip.ir import IR
-from tests.conftest import DATA_DIR, load_fixture
+from tests.conftest import DATA_DIR, knapsack_fixture_with_data, load_fixture
 
 
 def _run_generated(
@@ -195,13 +195,7 @@ class TestKnapsackInlineData:
     """Test knapsack with inline data embedded in IR → generate solver + data YAML, run."""
 
     def test_inline_data_solves_correctly(self):
-        raw = load_fixture("knapsack")
-        raw["data"] = {
-            "I": ["item1", "item2", "item3", "item4", "item5"],
-            "v": [4, 2, 10, 1, 2],
-            "w": [12, 1, 4, 1, 2],
-            "W": 15,
-        }
+        raw = knapsack_fixture_with_data()
         ir = IR.from_dict(raw)
         code = generate(ir)
 

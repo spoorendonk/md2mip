@@ -132,7 +132,7 @@ cp .env.template .env
 
 | Command    | Description                                |
 |------------|--------------------------------------------|
-| `compile`  | Markdown → standalone solver CLI            |
+| `compile`  | Markdown → standalone solver CLI           |
 | `run`      | Compile and immediately run with data      |
 | `validate` | Compile, run, check expected objective     |
 | `ocr`      | Extract a math model from an image (LLM vision) |

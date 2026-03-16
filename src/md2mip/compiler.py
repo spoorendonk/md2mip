@@ -61,7 +61,9 @@ def run_model(
             raise ValueError(
                 "No --data provided and the model has no inline data. Pass a data file with --data."
             )
-        tmp_data = Path(tempfile.mktemp(suffix=".yaml"))
+        tmp_df = tempfile.NamedTemporaryFile(suffix=".yaml", delete=False)
+        tmp_df.close()
+        tmp_data = Path(tmp_df.name)
         write_data_template(ir, tmp_data)
         data_path = str(tmp_data)
 
