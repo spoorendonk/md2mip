@@ -39,7 +39,7 @@ Key files:
 
 ## Pre-commit gate
 
-Always run before committing: `make test && make lint && make fmt && make typecheck`
+Always run before committing: `make fmt && make lint && make test && make typecheck`
 Don't commit formatting separately — run `make fmt` first, then commit everything together.
 
 ## Codegen invariant
