@@ -116,6 +116,33 @@ class TestIRValidation:
             ir.validate()
 
 
+class TestIRDataField:
+    def test_data_defaults_to_empty(self):
+        ir = IR()
+        assert ir.data == {}
+
+    def test_data_from_dict(self):
+        raw = {"data": {"I": ["a", "b"], "W": 10}, "variables": {}, "objective": {}}
+        ir = IR.from_dict(raw)
+        assert ir.data == {"I": ["a", "b"], "W": 10}
+
+    def test_existing_fixtures_get_empty_data(self):
+        raw = load_fixture("knapsack")
+        ir = IR.from_dict(raw)
+        assert ir.data == {}
+
+    def test_data_round_trip_json(self):
+        ir = IR(
+            name="test",
+            variables={"x": Variable()},
+            objective=Objective(sense="minimize", expression="x"),
+            data={"I": ["a", "b"], "v": [1, 2]},
+        )
+        json_str = ir.to_json()
+        ir2 = IR.from_json(json_str)
+        assert ir2.data == {"I": ["a", "b"], "v": [1, 2]}
+
+
 class TestAllFixturesValid:
     @pytest.mark.parametrize(
         "name",

@@ -1,0 +1,9 @@
+# Larger transportation instance (3 sources, 4 destinations)
+I: ["plant_a", "plant_b", "plant_c"]
+J: ["depot1", "depot2", "depot3", "depot4"]
+c:
+  - [8, 6, 10, 9]
+  - [9, 12, 13, 7]
+  - [14, 9, 16, 5]
+s: [350, 450, 200]
+d: [200, 300, 250, 250]

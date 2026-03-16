@@ -96,6 +96,31 @@ class TestCodegenSyntax:
             assert f"def setup_{cname}_constraints(" in code
 
 
+class TestCodegenHelp:
+    """Generated solver --help includes data format description."""
+
+    def test_help_includes_data_format(self):
+        raw = load_fixture("knapsack")
+        ir = IR.from_dict(raw)
+        code = generate(ir)
+        assert "Data file format" in code
+        assert "I: list of" in code
+        assert "v: array indexed by I" in code
+        assert "W: scalar" in code
+
+    def test_help_includes_model_name(self):
+        raw = load_fixture("transportation")
+        ir = IR.from_dict(raw)
+        code = generate(ir)
+        assert "transportation solver" in code
+
+    def test_help_uses_raw_description_formatter(self):
+        raw = load_fixture("transportation")
+        ir = IR.from_dict(raw)
+        code = generate(ir)
+        assert "RawDescriptionHelpFormatter" in code
+
+
 class TestCodegenStructure:
     def test_transportation_imports(self):
         raw = load_fixture("transportation")

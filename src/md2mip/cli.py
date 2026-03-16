@@ -7,7 +7,13 @@ from pathlib import Path
 
 import click
 
-from md2mip.compiler import compile_to_ir, compile_to_python, run_model, validate_model
+from md2mip.compiler import (
+    compile_to_ir,
+    compile_to_python,
+    run_model,
+    validate_model,
+    write_data_template,
+)
 from md2mip.llm import DEFAULT_MODEL
 from md2mip.ocr import ocr_image
 
@@ -75,7 +81,7 @@ def compile(model_path: str, output: str | None, ir_only: bool, model: str):
         out_path = Path(output)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(result)
-        click.echo(f"Written to {output}")
+        click.echo(f"Written: {output}")
     elif ir_only:
         click.echo(result)
     else:
@@ -83,18 +89,31 @@ def compile(model_path: str, output: str | None, ir_only: bool, model: str):
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         out_path = OUT_DIR / f"{stem}_solver.py"
         out_path.write_text(result)
-        click.echo(f"Written to {out_path}")
-        click.echo(f"Run:    python {out_path} <data.yaml>")
+        click.echo(f"Written: {out_path}")
+
+        # Write data template / complete data file
+        data_path = OUT_DIR / f"{stem}_data.yaml"
+        write_data_template(ir, data_path)
+        click.echo(f"Written: {data_path}")
+        click.echo(f"Run:     python {out_path} {data_path}")
 
 
 @cli.command()
 @click.argument("model_path", type=click.Path(exists=True))
 @click.option(
-    "--data", required=True, type=click.Path(exists=True), help="Data file (YAML or JSON)"
+    "--data",
+    required=False,
+    type=click.Path(exists=True),
+    default=None,
+    help="Data file (YAML or JSON). Optional if model contains inline data.",
 )
 @click.option("--model", default=DEFAULT_MODEL, help=f"LLM model string (default: {DEFAULT_MODEL})")
-def run(model_path: str, data: str, model: str):
+def run(model_path: str, data: str | None, model: str):
     """Compile and immediately run a model with data.
+
+    \b
+    If --data is omitted and the model contains inline data, the
+    extracted data is used automatically.
 
     \b
     Solver stdout format:
@@ -108,9 +127,14 @@ def run(model_path: str, data: str, model: str):
     \b
     Examples:
       md2mip run models/knapsack.md --data data/knapsack.yaml
+      md2mip run models/knapsack.md   # uses inline data if available
     """
     markdown = Path(model_path).read_text()
-    result = run_model(markdown, data, model=model)
+    try:
+        result = run_model(markdown, data, model=model)
+    except ValueError as e:
+        click.echo(str(e), err=True)
+        sys.exit(1)
     sys.exit(result.returncode)
 
 
@@ -134,7 +158,9 @@ def ocr(image_path: str, output: str | None, model: str):
 
     if output:
         Path(output).write_text(result)
-        click.echo(f"Written to {output}")
+        click.echo(f"Extracted model from {image_path}", err=True)
+        click.echo(f"Written: {output}")
+        click.echo(f"Run:     md2mip compile {output}")
     else:
         click.echo(result)
 

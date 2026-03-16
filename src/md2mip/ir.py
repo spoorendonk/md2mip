@@ -95,6 +95,7 @@ class IR:
     objective: Objective = field(default_factory=Objective)
     constraints: dict[str, Constraint] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
+    data: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, d: dict) -> IR:
@@ -106,6 +107,7 @@ class IR:
             objective=Objective.from_dict(d.get("objective", {})),
             constraints={k: Constraint.from_dict(v) for k, v in d.get("constraints", {}).items()},
             warnings=d.get("warnings", []),
+            data=d.get("data", {}),
         )
 
     @classmethod

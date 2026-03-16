@@ -1,7 +1,7 @@
 # md2mip
 
-Markdown → MIP: compiles natural-language optimization models (markdown)
-into standalone Python solver scripts using HiGHS via an LLM-generated IR.
+Markdown → MIP: compiles natural-language optimization models
+into standalone solver CLIs (Python + HiGHS) via an LLM-generated IR.
 
 ## Quick Reference
 
@@ -17,7 +17,8 @@ make typecheck    # mypy
 ## Architecture
 
 ```
-markdown → (LLM) → IR (JSON) → codegen → standalone Python + HiGHS
+markdown → (LLM) → IR (JSON) → codegen → solver CLI (Python + HiGHS)
+image    → (OCR) → markdown → …
 ```
 
 Key files:

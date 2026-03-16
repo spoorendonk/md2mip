@@ -9,7 +9,7 @@ import pytest
 
 from md2mip.codegen import generate
 from md2mip.ir import IR
-from tests.conftest import DATA_DIR, load_fixture
+from tests.conftest import DATA_DIR, knapsack_fixture_with_data, load_fixture
 
 
 def _run_generated(
@@ -54,6 +54,12 @@ class TestTransportation:
         assert rc == 0, f"Script failed:\n{stderr}"
         obj = _extract_objective(stdout)
         assert abs(obj - 215.0) < 0.01
+
+    def test_solves_large_instance(self):
+        rc, stdout, stderr = _run_generated("transportation", data_name="transportation_large")
+        assert rc == 0, f"Script failed:\n{stderr}"
+        obj = _extract_objective(stdout)
+        assert abs(obj - 8050.0) < 0.01
 
 
 @pytest.mark.solver
@@ -182,6 +188,36 @@ class TestTspMtz:
         assert rc == 0, f"Script failed:\n{stderr}"
         obj = _extract_objective(stdout)
         assert abs(obj - 85.0) < 0.01
+
+
+@pytest.mark.solver
+class TestKnapsackInlineData:
+    """Test knapsack with inline data embedded in IR → generate solver + data YAML, run."""
+
+    def test_inline_data_solves_correctly(self):
+        raw = knapsack_fixture_with_data()
+        ir = IR.from_dict(raw)
+        code = generate(ir)
+
+        from md2mip.data_template import generate_data_template
+
+        data_yaml = generate_data_template(ir)
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=True) as f:
+            f.write(code)
+            f.flush()
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=True) as df:
+                df.write(data_yaml)
+                df.flush()
+                result = subprocess.run(
+                    [sys.executable, f.name, df.name],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+        assert result.returncode == 0, f"Script failed:\n{result.stderr}"
+        obj = _extract_objective(result.stdout)
+        assert abs(obj - 15.0) < 0.01
 
 
 @pytest.mark.solver
