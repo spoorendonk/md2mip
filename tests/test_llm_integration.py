@@ -48,6 +48,12 @@ EXPECTED_OPTIMA = {
     "nasty_sudoku": 0.0,
     "nasty_multicommodity_flow": 14.0,
     "nasty_unit_commitment": 300.0,
+    "n_queens": 0.0,
+    "job_shop": 10.0,
+    "tsp_mtz": 85.0,
+    "nasty_n_queens": 0.0,
+    "nasty_job_shop": 10.0,
+    "nasty_tsp_mtz": 85.0,
 }
 
 # Lot sizing doesn't have a single known optimum, just a feasibility bound
@@ -65,6 +71,9 @@ DATA_FILE_MAP = {
     "nasty_sudoku": "sudoku",
     "nasty_multicommodity_flow": "multicommodity_flow",
     "nasty_unit_commitment": "unit_commitment",
+    "nasty_n_queens": "n_queens",
+    "nasty_job_shop": "job_shop",
+    "nasty_tsp_mtz": "tsp_mtz",
 }
 
 ALL_STANDARD_MODELS = [
@@ -80,6 +89,9 @@ ALL_STANDARD_MODELS = [
     "sudoku",
     "multicommodity_flow",
     "unit_commitment",
+    "n_queens",
+    "job_shop",
+    "tsp_mtz",
 ]
 
 NASTY_MODELS = [
@@ -95,6 +107,9 @@ NASTY_MODELS = [
     "nasty_sudoku",
     "nasty_multicommodity_flow",
     "nasty_unit_commitment",
+    "nasty_n_queens",
+    "nasty_job_shop",
+    "nasty_tsp_mtz",
 ]
 
 
@@ -168,6 +183,9 @@ class TestLLMEndToEnd:
             "sudoku",
             "multicommodity_flow",
             "unit_commitment",
+            "n_queens",
+            "job_shop",
+            "tsp_mtz",
         ]
         + NASTY_MODELS,
     )

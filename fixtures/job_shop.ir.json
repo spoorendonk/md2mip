@@ -1,0 +1,62 @@
+{
+  "name": "job_shop",
+  "sets": {
+    "J": { "description": "jobs" },
+    "M": { "description": "machines" }
+  },
+  "parameters": {
+    "duration": { "indices": ["J", "M"], "description": "processing time" },
+    "big_M": { "indices": [], "description": "large constant for disjunctive constraints" },
+    "pair_ub": { "indices": ["J", "J"], "description": "0 for distinct pairs, big_M for self-pairs (deactivation)" }
+  },
+  "variables": {
+    "start": {
+      "indices": ["J", "M"],
+      "type": "continuous",
+      "lower_bound": 0,
+      "upper_bound": null,
+      "description": "start time of job j on machine m"
+    },
+    "z": {
+      "indices": ["J", "J", "M"],
+      "type": "binary",
+      "lower_bound": 0,
+      "upper_bound": 1,
+      "description": "1 if job j1 precedes job j2 on machine m"
+    },
+    "makespan": {
+      "indices": [],
+      "type": "continuous",
+      "lower_bound": 0,
+      "upper_bound": null,
+      "description": "completion time of last job"
+    }
+  },
+  "objective": {
+    "sense": "minimize",
+    "expression": "makespan"
+  },
+  "constraints": {
+    "precedence_first": {
+      "for_all": ["j in J"],
+      "expression": "start[j,0] >= 0"
+    },
+    "precedence": {
+      "for_all": ["j in J", "m in M"],
+      "expression": "start[j,m] - start[j,m-1] >= duration[j,m-1]"
+    },
+    "disjunctive_fwd": {
+      "for_all": ["j1 in J", "j2 in J", "m in M"],
+      "expression": "start[j1,m] - start[j2,m] + big_M * z[j1,j2,m] <= big_M - duration[j1,m] + pair_ub[j1,j2]"
+    },
+    "disjunctive_bwd": {
+      "for_all": ["j1 in J", "j2 in J", "m in M"],
+      "expression": "start[j2,m] - start[j1,m] - big_M * z[j1,j2,m] <= -duration[j2,m] + pair_ub[j1,j2]"
+    },
+    "makespan_bound": {
+      "for_all": ["j in J"],
+      "expression": "makespan >= start[j,1] + duration[j,1]"
+    }
+  },
+  "warnings": ["precedence constraint uses m-1 lag; precedence_first handles m=0"]
+}
