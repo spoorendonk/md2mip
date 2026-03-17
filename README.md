@@ -116,9 +116,7 @@ Run:     md2mip compile model.md
 ## Install
 
 ```bash
-pip install -e '.[dev]'
-# or
-make
+pip install md2mip
 ```
 
 ## Configuration
