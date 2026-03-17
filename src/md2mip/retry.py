@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from typing import TypeVar
 
 import litellm
-
-T = TypeVar("T")
 
 MAX_RETRIES = 3
 RETRY_BACKOFF = 10  # seconds
@@ -18,7 +15,7 @@ class LLMError(Exception):
     """Raised when the LLM call or response parsing fails."""
 
 
-def litellm_retry(
+def litellm_retry[T](
     fn: Callable[[], T],
     *,
     model: str,

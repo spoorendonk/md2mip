@@ -6,11 +6,25 @@ build-backend = "setuptools.build_meta"
 name = "md2mip"
 version = "0.1.0"
 description = "Compile Markdown/LaTeX MIP models into standalone Python solver scripts"
-requires-python = ">=3.10"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [{ name = "Simon Spoorendonk" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
 dependencies = [
     "litellm",
     "click",
 ]
+
+[project.urls]
+Homepage = "https://github.com/spoorendonk/md2mip"
+Repository = "https://github.com/spoorendonk/md2mip"
+Issues = "https://github.com/spoorendonk/md2mip/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -32,7 +46,7 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
@@ -43,7 +57,7 @@ ignore = ["SIM116"]  # allow if/elif chains for readability
 "src/md2mip/compiler.py" = ["SIM115"]  # intentional: tempfile with delete=False + manual cleanup
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false

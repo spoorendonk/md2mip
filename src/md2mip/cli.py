@@ -21,6 +21,7 @@ OUT_DIR = Path("out")
 
 
 @click.group()
+@click.version_option(package_name="md2mip")
 def cli():
     """md2mip — compile Markdown/LaTeX MIP models into standalone Python solver scripts.
 
