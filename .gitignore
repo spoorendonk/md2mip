@@ -8,3 +8,6 @@ build/
 out/
 .pytest_cache/
 *.egg
+.claude/
+.mypy_cache/
+.ruff_cache/
