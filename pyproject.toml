@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "md2mip"
-version = "0.1.0"
+version = "0.1.1"
 description = "Compile Markdown/LaTeX MIP models into standalone Python solver scripts"
 readme = "README.md"
 license = "MIT"
@@ -19,6 +19,7 @@ classifiers = [
 dependencies = [
     "litellm",
     "click",
+    "highspy",
 ]
 
 [project.urls]
@@ -29,7 +30,6 @@ Issues = "https://github.com/spoorendonk/md2mip/issues"
 [project.optional-dependencies]
 dev = [
     "pytest",
-    "highspy",
     "numpy",
     "pyyaml",
     "Pillow",
