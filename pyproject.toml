@@ -19,7 +19,7 @@ classifiers = [
 dependencies = [
     "litellm",
     "click",
-    "highspy",
+    "highspy>=1.14",
 ]
 
 [project.urls]

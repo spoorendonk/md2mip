@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "md2mip"
+type: software
+authors:
+  - family-names: Spoorendonk
+    given-names: Simon
+license: MIT
+repository-code: "https://github.com/spoorendonk/md2mip"
+url: "https://github.com/spoorendonk/md2mip"
+abstract: >-
+  Compile Markdown/LaTeX MIP models into standalone
+  Python solver scripts using HiGHS.
